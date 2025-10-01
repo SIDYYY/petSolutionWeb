@@ -7,12 +7,14 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-.env
-serviceAccount.json
+
 node_modules
 dist
 dist-ssr
+
 *.local
+.env
+serviceAccount.json
 
 # Editor directories and files
 .vscode/*
