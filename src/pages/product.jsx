@@ -72,6 +72,7 @@ export default function Products() {
         <thead>
           <tr className="bg-gray-100 text-left">
             <th className="p-2 border-b">Name</th>
+            <th className="p-2 border-b">Price</th>
             <th className="p-2 border-b">Quantity</th>
           </tr>
         </thead>
@@ -94,6 +95,7 @@ export default function Products() {
           .map(prod => (
             <tr key={prod.id} className="hover:bg-gray-50">
               <td className="p-2 border-b">{prod.name}</td>
+              <td className="p-2 border-b">₱ {prod.price}</td>
               <td className="p-2 border-b ">{prod.qty}
                 {prod.qty < 0 && (
                 <span className="ml-4 px-2 py-1 rounded-full bg-yellow-500 text-white text-sm font-semibold  items-center whitespace-nowrap ">

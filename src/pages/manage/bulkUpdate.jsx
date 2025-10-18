@@ -4,9 +4,7 @@ import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
 export default function BulkUpdate() {
-  // Firestore snapshot
   const [dbProducts, setDbProducts] = useState(new Map());
-  // CSV rows that actually differ
   const [diff, setDiff] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState({ msg: '', type: '' });
@@ -17,7 +15,7 @@ export default function BulkUpdate() {
     return () => clearTimeout(id);
   }, [toast]);
 
-  /* 0️⃣  fetch existing products once */
+  /* Fetch existing Firestore data */
   useEffect(() => {
     const fetchDb = async () => {
       const snap = await getDocs(collection(db, 'products'));
@@ -28,7 +26,7 @@ export default function BulkUpdate() {
     fetchDb();
   }, []);
 
-  /* 1️⃣  Parse CSV + diff */
+  /* Parse CSV + detect changed rows */
   const handleCSVUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -38,28 +36,41 @@ export default function BulkUpdate() {
       skipEmptyLines: true,
       complete: ({ data }) => {
         const changed = data
-          .map((row, i) => {
-            const id   = row['ID']?.trim();
-            const name = row['Product']?.trim() ?? '';
-            const qty  = Number((row['Qty.'] || '0').toString().replace(/[^\d.-]/g, ''));
-
+          .map((row) => {
+            const id = row['SKU']?.trim(); // SKU = product ID
             if (!id) return null;
 
-            const inDb = dbProducts.get(id);
-            const sameName = inDb?.name === name;
-            const sameQty  = Number(inDb?.qty) === qty;
+            const product = {
+              name: row['Name']?.trim() || '',
+              productGroup: row['ProductGroup']?.trim() || '',
+              qty: Number((row['Quantity'] || '0').toString().replace(/[^\d.-]/g, '')),
+              price: Number((row['Price'] || '0').toString().replace(/[^\d.-]/g, '')),
+              threshold: Number((row['THRESHOLD VALUE'] || '0').toString().replace(/[^\d.-]/g, '')),
+              deadstock: row['DEADSTOCK']?.trim() === '1', // 1 = true, 0 = false
+            };
 
-            // keep if something is different or doc missing
-            return sameName && sameQty ? null : { id, name, qty };
+            const inDb = dbProducts.get(id);
+
+            // compare with Firestore document
+            const isSame =
+              inDb &&
+              inDb.name === product.name &&
+              inDb.productGroup === product.productGroup &&
+              Number(inDb.qty) === product.qty &&
+              Number(inDb.price) === product.price &&
+              Number(inDb.threshold) === product.threshold &&
+              Boolean(inDb.deadstock) === product.deadstock;
+
+            return isSame ? null : { id, ...product };
           })
-          .filter(Boolean); // remove nulls
+          .filter(Boolean);
 
         setDiff(changed);
       },
     });
   };
 
-  /* 2️⃣  Bulk update only changed docs */
+  /* Bulk update Firestore */
   const handleUpdate = async () => {
     if (diff.length === 0) return;
     setUploading(true);
@@ -67,84 +78,101 @@ export default function BulkUpdate() {
     try {
       for (let i = 0; i < diff.length; i += 500) {
         const batch = writeBatch(db);
-        diff.slice(i, i + 500).forEach(prod => {
+        diff.slice(i, i + 500).forEach((prod) => {
           const ref = doc(db, 'products', prod.id);
-          batch.set(ref, { name: prod.name, qty: prod.qty }, { merge: true });
+          batch.set(
+            ref,
+            {
+              name: prod.name,
+              productGroup: prod.productGroup,
+              qty: prod.qty,
+              price: prod.price,
+              threshold: prod.threshold,
+              deadstock: prod.deadstock,
+            },
+            { merge: true }
+          );
         });
         await batch.commit();
       }
-      setToast({ msg: ' ✅ Bulk update successful!', type: 'success' });
+      setToast({ msg: '✅ Bulk update successful!', type: 'success' });
       setDiff([]);
     } catch (err) {
       console.error(err);
-      setToast({ msg: ' ❌ Update failed – check console.', type: 'error' });
+      setToast({ msg: '❌ Update failed – check console.', type: 'error' });
     } finally {
       setUploading(false);
     }
   };
 
-  /* 3️⃣  UI */
+  /* UI */
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6 border rounded-sm  ">
+    <div className="p-6 max-w-6xl mx-auto space-y-6 border rounded-sm">
       <h2 className="text-2xl font-bold text-orange-500">Bulk Product Update</h2>
 
-      <div className='flex justify-between'>
-      <input
-        type="file"
-        accept=".csv"
-        onChange={handleCSVUpload}
-        className="border p-2 rounded items-center align-middle flex"
-      />
+      <div className="flex justify-between">
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleCSVUpload}
+          className="border p-2 rounded items-center flex"
+        />
 
-      <button
-            onClick={handleUpdate}
-            className="mt-4 bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 disabled:opacity-60"
-            disabled={uploading}
-          >
-            {uploading ? 'Updating…' : 'Confirm Update'}
-      </button>
+        <button
+          onClick={handleUpdate}
+          className="mt-4 bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 disabled:opacity-60"
+          disabled={uploading}
+        >
+          {uploading ? 'Updating…' : 'Confirm Update'}
+        </button>
       </div>
 
       {toast.msg && (
         <div
           className={`fixed top-2 right-0 px-5 py-3 rounded-l-full shadow-lg text-white 
-                      ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
-                      animate-slide-right `}
+            ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
+            animate-slide-right`}
         >
           {toast.msg}
         </div>
       )}
-      {/* show only changed rows */}
-      {diff.length > 0 && (
+
+      {diff.length > 0 ? (
         <>
           <p className="text-gray-600 mt-4">
             Showing {diff.length} product{diff.length > 1 && 's'} with changes
           </p>
 
-          <table className="w-full mt-2 table-auto border">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="p-2 border">ID</th>
-                <th className="p-2 border">Name</th>
-                <th className="p-2 border">Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {diff.map((p) => (
-                <tr key={p.id}>
-                  <td className="p-2 border">{p.id}</td>
-                  <td className="p-2 border">{p.name}</td>
-                  <td className="p-2 border">{p.qty}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full mt-2 table-auto border text-sm">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-2 border">SKU (ID)</th>
+                  <th className="p-2 border">Name</th>
+                  <th className="p-2 border">Product Group</th>
+                  <th className="p-2 border">Quantity</th>
+                  <th className="p-2 border">Price</th>
+                  <th className="p-2 border">Threshold</th>
+                  <th className="p-2 border">Deadstock</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          
+              </thead>
+              <tbody>
+                {diff.map((p) => (
+                  <tr key={p.id}>
+                    <td className="p-2 border">{p.id}</td>
+                    <td className="p-2 border">{p.name}</td>
+                    <td className="p-2 border">{p.productGroup}</td>
+                    <td className="p-2 border">{p.qty}</td>
+                    <td className="p-2 border">{p.price}</td>
+                    <td className="p-2 border">{p.threshold}</td>
+                    <td className="p-2 border">{p.deadstock ? 'Yes' : 'No'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
-      )}
-
-      {diff.length === 0 && (
+      ) : (
         <p className="text-gray-400 mt-4">
           Upload a CSV to see which products will change.
         </p>

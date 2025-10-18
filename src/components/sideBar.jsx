@@ -38,7 +38,7 @@ export default function Sidebar({ onUnlock }) {
       <aside className="w-64 bg-[#FF9500] shadow-md">
         <div className="p-4 text-2xl font-bold border-b flex flex-row gap-3 items-center ">
           <img className="w-16 h-14" src="/petsolution.png" />
-          <h3 className="text-2xl font-semibold text-white">Pet Inventory</h3>
+          <h3 className="text-2xl font-semibold text-white">Pet Solution</h3>
         </div>
         <nav className="p-4 space-y-2">
           <NavLink to="/dashboard" className="flex items-center gap-3 px-3 py-2 text-white">
@@ -60,9 +60,9 @@ export default function Sidebar({ onUnlock }) {
             <PlusSquare size={20} /> <span>Manage Products</span>
           </a>
 
-          <NavLink to="/reports" className="flex items-center gap-3 px-3 py-2 text-white">
+          {/* <NavLink to="/reports" className="flex items-center gap-3 px-3 py-2 text-white">
             <BarChart2 size={20} /> <span>Reports</span>
-          </NavLink>
+          </NavLink> */}
         </nav>
 
         {/* Logout button */}
