@@ -70,7 +70,7 @@ export default function Products() {
 
       <table className="w-full table-auto border-collapse">
         <thead>
-          <tr className="bg-gray-100 text-left">
+          <tr className="bg-orange-500 text-left text-white">
             <th className="p-2 border-b">Name</th>
             <th className="p-2 border-b">Price</th>
             <th className="p-2 border-b">Quantity</th>

@@ -41,24 +41,57 @@ export default function Sidebar({ onUnlock }) {
           <h3 className="text-2xl font-semibold text-white">Pet Solution</h3>
         </div>
         <nav className="p-4 space-y-2">
-          <NavLink to="/dashboard" className="flex items-center gap-3 px-3 py-2 text-white">
-            <Home size={20} /> <span>Dashboard</span>
-          </NavLink>
-          <NavLink to="/cashier" className="flex items-center gap-3 px-3 py-2 text-white">
-            <BarChart2 size={20} /> <span>Cashier</span>
-          </NavLink>
-          <NavLink to="/products" className="flex items-center gap-3 px-3 py-2 text-white">
-            <Box size={20} /> <span>Products</span>
-          </NavLink>
+        <NavLink
+          to="/dashboard"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-white text-[#FF9500] font-semibold"
+                : "text-white hover:bg-white/20"
+            }`
+          }
+        >
+          <Home size={20} /> <span>Dashboard</span>
+        </NavLink>
+
+        <NavLink
+          to="/cashier"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-white text-[#FF9500] font-semibold"
+                : "text-white hover:bg-white/20"
+            }`
+          }
+        >
+          <BarChart2 size={20} /> <span>Cashier</span>
+        </NavLink>
+
+        <NavLink
+          to="/products"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-white text-[#FF9500] font-semibold"
+                : "text-white hover:bg-white/20"
+            }`
+          }
+        >
+          <Box size={20} /> <span>Products</span>
+        </NavLink>
 
           {/* Manage Products (protected by password modal) */}
-          <a
-            href="/manageProduct"
-            onClick={handleManageClick}
-            className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg"
-          >
-            <PlusSquare size={20} /> <span>Manage Products</span>
-          </a>
+        <a
+          href="/manageProduct"
+          onClick={handleManageClick}
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+            window.location.pathname === "/manageProduct"
+              ? "bg-white text-[#FF9500] font-semibold"
+              : "text-white hover:bg-white/20"
+          }`}
+        >
+          <PlusSquare size={20} /> <span>Manage Products</span>
+        </a>
 
           {/* <NavLink to="/reports" className="flex items-center gap-3 px-3 py-2 text-white">
             <BarChart2 size={20} /> <span>Reports</span>

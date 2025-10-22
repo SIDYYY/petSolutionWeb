@@ -7,9 +7,11 @@ import {
   updateDoc,
   addDoc,
   serverTimestamp,
-  increment,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { Search, Trash2 } from "lucide-react";
+import { useLocation } from "react-router-dom";
+
 
 export default function Cashier() {
   const [search, setSearch] = useState("");
@@ -19,15 +21,22 @@ export default function Cashier() {
   const [salesHistory, setSalesHistory] = useState([]);
   const [message, setMessage] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showSales, setShowSales] = useState(false);
-  const [showAdminPrompt, setShowAdminPrompt] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
+  const [showSalesHistory, setShowSalesHistory] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
-
-  const ADMIN_PASSWORD = "admin123";
+  const [adminPassword, setAdminPassword] = useState("");
   const searchRef = useRef(null);
+  const location = useLocation();
 
-  // 🔄 Load all products
+  useEffect(() => {
+  const query = new URLSearchParams(location.search);
+  if (query.get("view") === "sales") {
+    fetchSalesHistory(); // Load sales
+    setShowSalesHistory(true); // Show sales history immediately
+  }
+}, [location]);
+
+  // ✅ FETCH PRODUCTS
   useEffect(() => {
     const fetchProducts = async () => {
       const snap = await getDocs(collection(db, "products"));
@@ -37,38 +46,50 @@ export default function Cashier() {
     fetchProducts();
   }, []);
 
-  // 🔄 Load sales history
-  useEffect(() => {
-    const fetchSales = async () => {
-      const snap = await getDocs(collection(db, "sales_history"));
-      const sales = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      sales.sort((a, b) => {
-        const as = a.createdAt?.seconds || 0;
-        const bs = b.createdAt?.seconds || 0;
-        return bs - as;
-      });
-      setSalesHistory(sales);
-    };
-    fetchSales();
-  }, []);
+  // ✅ FETCH SALES HISTORY
+  const fetchSalesHistory = async () => {
+    const snap = await getDocs(collection(db, "sales_history"));
+    const sales = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  // 🔍 Multi-keyword search
-  useEffect(() => {
-    if (!search.trim()) {
-      setProducts([]);
-      return;
-    }
-    const keywords = search.toLowerCase().split(" ").filter(Boolean);
-    const results = allProducts.filter((p) => {
-      const name = p.name?.toLowerCase() || "";
-      const sku = (p.sku || "").toLowerCase();
-      return keywords.every((word) => name.includes(word) || sku.includes(word));
+    // 🔥 Flatten all sales into individual product rows
+    let flattened = [];
+    sales.forEach((sale) => {
+      if (Array.isArray(sale.items)) {
+        sale.items.forEach((item) => {
+          flattened.push({
+            saleId: sale.id,
+            date: sale.createdAt?.seconds
+              ? new Date(sale.createdAt.seconds * 1000).toLocaleString()
+              : "—",
+            name: item.name,
+            qty: item.qty,
+            subtotal: item.subtotal || item.price * item.qty,
+            status: sale.status || "completed",
+          });
+        });
+      }
     });
+
+    // Sort by most recent
+    flattened.sort((a, b) => new Date(b.date) - new Date(a.date));
+    setSalesHistory(flattened);
+  };
+
+  // ✅ SEARCH PRODUCTS
+  useEffect(() => {
+    if (!search.trim()) return setProducts([]);
+    const keywords = search.toLowerCase().split(" ").filter(Boolean);
+    const results = allProducts.filter((p) =>
+      keywords.every(
+        (word) =>
+          p.name?.toLowerCase().includes(word) ||
+          (p.sku || "").toLowerCase().includes(word)
+      )
+    );
     setProducts(results);
     setShowDropdown(true);
   }, [search, allProducts]);
 
-  // ⛔ Close dropdown when clicked outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
@@ -79,23 +100,14 @@ export default function Cashier() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 🛒 Add product to cart
+  // ✅ ADD TO CART
   const addToCart = (product) => {
-    if (product.qty <= 0) {
-      setMessage("❌ No stock available!");
-      return;
-    }
-    if (product.qty > 0 && product.qty <= 5) {
-      setMessage("⚠️ Low stock – restock soon!");
-    } else {
-      setMessage(null);
-    }
-
+    if (product.qty <= 0) return setMessage("❌ No stock available!");
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
         if (existing.quantity >= product.qty) {
-          setMessage("❌ Not enough stock available!");
+          setMessage("❌ Not enough stock!");
           return prev;
         }
         return prev.map((item) =>
@@ -106,374 +118,351 @@ export default function Cashier() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
-
     setShowDropdown(false);
     setSearch("");
+    setMessage(null);
   };
 
-  // ➕ ➖ Update qty
-  const updateQuantity = (id, amount) => {
+  // ✅ UPDATE QUANTITY
+  const updateQuantity = (id, change) => {
     setCart((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              quantity: Math.max(
-                1,
-                Math.min(item.qty, item.quantity + amount)
-              ),
-            }
-          : item
-      )
+      prev.map((item) => {
+        if (item.id === id) {
+          const newQty = item.quantity + change;
+          if (newQty < 1) return item;
+          if (newQty > item.qty) {
+            setMessage("❌ Exceeds available stock!");
+            return item;
+          }
+          return { ...item, quantity: newQty };
+        }
+        return item;
+      })
     );
   };
 
-  // ❌ Remove from cart
+  // ✅ REMOVE FROM CART
   const removeFromCart = (id) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // ✅ Complete Purchase (with dynamic monthly tracking)
+  // ✅ COMPLETE PURCHASE
   const completePurchase = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0) {
+      setMessage("⚠️ No products in cart! Please add an item first.");
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
 
     try {
-      const monthKey = new Date().toISOString().slice(0, 7); // e.g. "2025-10"
-
+      const monthKey = new Date().toISOString().slice(0, 7);
       for (const item of cart) {
-        const productRef = doc(db, "products", item.id);
-        const productSnap = await getDoc(productRef);
-        const currentData = productSnap.data();
-
-        const currentMonthlySales = currentData.monthlySales || {};
-        const currentMonthSales = currentMonthlySales[monthKey] || 0;
-
-        await updateDoc(productRef, {
-          qty: currentData.qty - item.quantity,
-          [`monthlySales.${monthKey}`]: currentMonthSales + item.quantity,
+        const ref = doc(db, "products", item.id);
+        const snap = await getDoc(ref);
+        const current = snap.data();
+        await updateDoc(ref, {
+          qty: current.qty - item.quantity,
+          [`monthlySales.${monthKey}`]:
+            (current.monthlySales?.[monthKey] || 0) + item.quantity,
         });
       }
 
-      const saleItems = cart.map((item) => ({
-        productId: item.id,
-        name: item.name,
-        qty: item.quantity,
-        price: item.price || 0,
-        subtotal: (item.price || 0) * item.quantity,
+      const saleItems = cart.map((i) => ({
+        productId: i.id,
+        name: i.name,
+        qty: i.quantity,
+        price: i.price,
+        subtotal: i.price * i.quantity,
       }));
-
-      const total = saleItems.reduce((s, it) => s + it.subtotal, 0);
-
-      const saleDoc = await addDoc(collection(db, "sales_history"), {
+      const total = saleItems.reduce((s, i) => s + i.subtotal, 0);
+      await addDoc(collection(db, "sales_history"), {
         items: saleItems,
         total,
         month: monthKey,
         status: "completed",
         createdAt: serverTimestamp(),
       });
-
-      setSalesHistory((prev) => [
-        {
-          id: saleDoc.id,
-          items: saleItems,
-          total,
-          month: monthKey,
-          status: "completed",
-          createdAt: { seconds: Math.floor(Date.now() / 1000) },
-        },
-        ...prev,
-      ]);
-
       setCart([]);
-      setMessage(" Purchase completed & logged for this month!");
+      setMessage("✅ Purchase completed!");
     } catch (err) {
-      console.error("Error completing purchase:", err);
+      console.error(err);
       setMessage("❌ Error completing purchase.");
     }
   };
 
-  // 🔁 Request refund
-  const requestRefund = (sale) => {
-    if (sale.status === "refunded") {
-      setMessage("❌ This sale is already refunded.");
-      return;
-    }
+  // ✅ REFUND HANDLER (MODAL)
+  const openRefundModal = (sale) => {
     setSelectedSale(sale);
-    setShowAdminPrompt(true);
+    setShowRefundModal(true);
   };
 
-  // 🔒 Confirm refund (reverse monthly record)
   const confirmRefund = async () => {
-    if (!selectedSale) return;
-    if (adminPassword !== ADMIN_PASSWORD) {
-      alert("❌ Incorrect admin password!");
+    if (adminPassword !== "admin123") {
+      setMessage("❌ Incorrect admin password!");
+      setTimeout(() => setMessage(null), 3000);
       return;
     }
 
     try {
-      const monthKey =
-        selectedSale.month || new Date().toISOString().slice(0, 7);
-
-      for (const soldItem of selectedSale.items) {
-        const productRef = doc(db, "products", soldItem.productId);
-        const productSnap = await getDoc(productRef);
-        const currentData = productSnap.data();
-
-        const currentMonthlySales = currentData.monthlySales || {};
-        const currentMonthSales = currentMonthlySales[monthKey] || 0;
-
-        await updateDoc(productRef, {
-          qty: currentData.qty + soldItem.qty,
-          [`monthlySales.${monthKey}`]: Math.max(
-            0,
-            currentMonthSales - soldItem.qty
-          ),
-        });
-      }
-
-      const saleRef = doc(db, "sales_history", selectedSale.id);
+      const saleRef = doc(db, "sales_history", selectedSale.saleId);
       await updateDoc(saleRef, { status: "refunded" });
-
-      setSalesHistory((prev) =>
-        prev.map((s) =>
-          s.id === selectedSale.id ? { ...s, status: "refunded" } : s
-        )
-      );
-
-      setMessage("🔄 Sale refunded and monthly stats updated!");
-    } catch (err) {
-      console.error("Error refunding sale:", err);
-      setMessage("❌ Error refunding sale.");
-    } finally {
-      setShowAdminPrompt(false);
+      fetchSalesHistory();
+      setShowRefundModal(false);
       setAdminPassword("");
-      setSelectedSale(null);
+      setMessage("✅ Sale refunded successfully!");
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      setMessage("❌ Failed to refund sale.");
+      setTimeout(() => setMessage(null), 3000);
     }
   };
 
-  const totalPrice = cart.reduce(
-    (sum, item) => sum + (item.price || 0) * item.quantity,
-    0
-  );
+  const totalPrice = cart.reduce((s, i) => s + (i.price || 0) * i.quantity, 0);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-center">Pet Solution CDO</h1>
-
-      {/* Buttons */}
-      <div className="flex justify-center mb-6 gap-4">
-        <button
-          onClick={() => setShowSales(false)}
-          className={`px-5 py-2 rounded-lg ${
-            !showSales ? "bg-blue-600 text-white" : "bg-gray-200"
-          }`}
+    <div className="h-full w-full bg-white flex flex-col lg:flex-row justify-between items-start p-3 sm:p-4 md:p-6 overflow-hidden">
+      {/* ✅ MESSAGE POPUP */}
+      {message && (
+        <div
+          className={`fixed top-6 right-6 z-50 flex items-start gap-3 border-l-4 rounded-md shadow-lg p-4 w-[300px] 
+          ${message.includes("✅") ? "border-green-600 bg-green-50 text-green-800" : ""} 
+          ${message.includes("❌") ? "border-red-600 bg-red-50 text-red-800" : ""} 
+          ${message.includes("⚠️") ? "border-yellow-500 bg-yellow-50 text-yellow-800" : ""}`}
         >
-           Cashier
-        </button>
-        <button
-          onClick={() => setShowSales(true)}
-          className={`px-5 py-2 rounded-lg ${
-            showSales ? "bg-blue-600 text-white" : "bg-gray-200"
-          }`}
-        >
-           Sales History
-        </button>
-      </div>
+          <div className="flex-1">
+            <p className="font-semibold">
+              {message.includes("✅")
+                ? "Success"
+                : message.includes("❌")
+                ? "Error"
+                : "Notice"}
+            </p>
+            <p className="text-sm">{message.replace(/[✅❌⚠️]/g, "").trim()}</p>
+          </div>
+          <button
+            onClick={() => setMessage(null)}
+            className="ml-2 text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
-      {/* Cashier View */}
-      {!showSales && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* LEFT: Search */}
-          <div>
-            <div className="mb-4 relative" ref={searchRef}>
-              <input
-                type="text"
-                placeholder="Search product..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full border p-3 rounded-lg text-lg"
-              />
+      <div className="flex flex-col lg:flex-row w-full gap-4 overflow-hidden">
+        {/* ✅ LEFT SIDE TABLE */}
+        <div className="flex-1 border border-orange-300 rounded-md bg-white shadow-sm flex flex-col overflow-hidden">
+
+          {!showSalesHistory && (
+            <div ref={searchRef} className="relative p-3 sm:p-4 border-b border-orange-200">
+              <div className="flex items-center gap-2 border border-orange-300 bg-orange-50 rounded-md px-3 py-2">
+                <Search className="text-orange-500" size={18} />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search product by name"
+                  className="w-full bg-transparent outline-none text-gray-700 text-sm"
+                />
+              </div>
               {showDropdown && products.length > 0 && (
-                <div className="absolute top-full left-0 bg-white border rounded shadow-md w-full max-h-60 overflow-y-auto z-10">
-                  <ul>
-                    {products.map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex justify-between px-4 py-3 cursor-pointer hover:bg-orange-100"
-                        onClick={() => addToCart(p)}
-                      >
-                        <span>{p.name}</span>
-                        <span className="text-sm text-gray-500">
-                          Stock: {p.qty}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                <div className="absolute left-3 right-3 z-30 mt-2 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {products.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => addToCart(p)}
+                      className="flex justify-between items-center px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
+                    >
+                      <span>{p.name}</span>
+                      <span className="text-gray-500">Stock: {p.qty}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-
-            {message && (
-              <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 rounded">
-                {message}
-              </div>
+          )}
+          
+          {/* ✅ TABLE HEADER */}
+          <div className="hidden sm:grid grid-cols-12 font-semibold text-orange-500 border-b border-orange-300 px-4 py-2 text-xs sm:text-sm">
+            {!showSalesHistory ? (
+              <>
+                <div className="col-span-5">Product name</div>
+                <div className="col-span-2 text-center">Qty</div>
+                <div className="col-span-2 text-right">Price</div>
+                <div className="col-span-2 text-right">Amount</div>
+                <div className="col-span-1"></div>
+              </>
+            ) : (
+              <>
+                <div className="col-span-3">Date</div>
+                <div className="col-span-3 text-left">Product</div>
+                <div className="col-span-2 text-center">Qty</div>
+                <div className="col-span-2 text-right">Total</div>
+                <div className="col-span-2 text-center">Action</div>
+              </>
             )}
           </div>
 
-          {/* RIGHT: Cart */}
-          <div className="border rounded-lg p-4 bg-gray-50">
-            <h2 className="text-xl font-semibold mb-3">🛒 Cart</h2>
-            {cart.length === 0 ? (
-              <p className="text-gray-500">No items added</p>
-            ) : (
-              <ul>
-                {cart.map((item) => (
-                  <li
+          {/* ✅ TABLE BODY */}
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+            {!showSalesHistory ? (
+              cart.length === 0 ? (
+                <div className="text-center text-gray-400 py-24 text-sm">
+                  <div className="text-base font-medium">No items</div>
+                  <div className="text-xs mt-2">
+                    Add products using the search bar above
+                  </div>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div
                     key={item.id}
-                    className="flex justify-between items-center py-3 border-b"
+                    className="grid grid-cols-2 sm:grid-cols-12 items-center py-2 border-b last:border-b-0 text-sm"
                   >
-                    <span className="font-medium">
-                      {item.name} (₱{item.price})
-                    </span>
-                    <div className="flex items-center gap-2">
+                    <div className="sm:col-span-5 text-left">
+                      <div className="font-medium text-gray-700">{item.name}</div>
+                      <div className="text-xs text-gray-400">Stock: {item.qty}</div>
+                    </div>
+                    <div className="flex sm:col-span-2 justify-center items-center gap-2 mt-2 sm:mt-0">
                       <button
-                        className="px-3 py-1 bg-gray-300 rounded text-lg"
                         onClick={() => updateQuantity(item.id, -1)}
+                        className="bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200"
                       >
-                        −
+                        –
                       </button>
-                      <span className="text-lg">{item.quantity}</span>
+                      <span className="text-sm font-semibold w-6 text-center">
+                        {item.quantity}
+                      </span>
                       <button
-                        className="px-3 py-1 bg-gray-300 rounded text-lg"
                         onClick={() => updateQuantity(item.id, 1)}
+                        className="bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200"
                       >
                         +
                       </button>
+                    </div>
+                    <div className="hidden sm:block sm:col-span-2 text-right">
+                      ₱{item.price.toFixed(2)}
+                    </div>
+                    <div className="hidden sm:block sm:col-span-2 text-right">
+                      ₱{(item.price * item.quantity).toFixed(2)}
+                    </div>
+                    <div className="text-right sm:col-span-1">
                       <button
-                        className="px-3 py-1 bg-red-500 text-white rounded"
                         onClick={() => removeFromCart(item.id)}
+                        className="text-red-500 hover:text-red-700"
                       >
-                        ✕
+                        <Trash2 size={16} />
                       </button>
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                ))
+              )
+            ) : (
+              salesHistory.map((sale, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-1 sm:grid-cols-12 items-center py-2 border-b text-xs sm:text-sm"
+                >
+                  <div className="sm:col-span-3">{sale.date}</div>
+                  <div className="sm:col-span-3 text-left">{sale.name}</div>
+                  <div className="sm:col-span-2 text-center">{sale.qty}</div>
+                  <div className="sm:col-span-2 text-right">
+                    ₱{sale.subtotal?.toFixed(2) || 0}
+                  </div>
+                  <div className="sm:col-span-2 text-center">
+                    {sale.status === "completed" ? (
+                      <button
+                        onClick={() => openRefundModal(sale)}
+                        className="text-orange-500 hover:text-orange-700 font-medium"
+                      >
+                        Refund
+                      </button>
+                    ) : (
+                      <span className="text-red-500 font-semibold">Refunded</span>
+                    )}
+                  </div>
+                </div>
+              ))
             )}
-
-            <div className="text-right mt-4 text-xl font-bold">
-              Total: ₱{totalPrice.toFixed(2)}
-            </div>
-
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={completePurchase}
-                className="flex-1 bg-green-600 text-white py-3 rounded-lg text-lg"
-              >
-                 Complete Purchase
-              </button>
-            </div>
           </div>
-        </div>
-      )}
 
-      {/* 📜 Sales History */}
-      {showSales && (
-        <div className="mt-6">
-          <h2 className="text-2xl font-semibold mb-4 text-center">
-            📦 Sales History
-          </h2>
-          <div className="overflow-x-auto border rounded-lg bg-white">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-100 text-gray-700">
-                  <th className="p-3 border">Date</th>
-                  <th className="p-3 border">Items</th>
-                  <th className="p-3 border">Total</th>
-                  <th className="p-3 border">Status</th>
-                  <th className="p-3 border">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {salesHistory.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-gray-50">
-                    <td className="p-3 border">
-                      {sale.createdAt?.seconds
-                        ? new Date(
-                            sale.createdAt.seconds * 1000
-                          ).toLocaleString()
-                        : "—"}
-                    </td>
-                    <td className="p-3 border">
-                      {sale.items.map((i) => (
-                        <div key={i.productId}>
-                          {i.name} x{i.qty}
-                        </div>
-                      ))}
-                    </td>
-                    <td className="p-3 border">
-                      ₱{(sale.total || 0).toFixed(2)}
-                    </td>
-                    <td
-                      className={`p-3 border font-medium ${
-                        sale.status === "refunded"
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    >
-                      {sale.status}
-                    </td>
-                    <td className="p-3 border">
-                      {sale.status !== "refunded" ? (
-                        <button
-                          onClick={() => requestRefund(sale)}
-                          className="bg-red-500 text-white px-3 py-1 rounded"
-                        >
-                          Refund
-                        </button>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {!showSalesHistory && (
+            <div className="border-t border-orange-300 p-3 sm:p-4 text-right">
+              <div className="text-xs sm:text-sm text-gray-600">TOTAL</div>
+              <div className="text-lg sm:text-2xl font-bold text-gray-800">
+                ₱{totalPrice.toFixed(2)}
+              </div>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* 🔐 Admin Prompt */}
-      {showAdminPrompt && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-xl font-semibold mb-4 text-center">
-              🔐 Admin Confirmation
-            </h3>
-            <p className="mb-3 text-gray-600 text-center">
-              Please enter admin password to confirm refund.
+        {/* ✅ BUTTONS */}
+        <div className="flex flex-wrap lg:flex-col justify-center lg:justify-start items-stretch gap-3 mt-4 lg:mt-0 w-full lg:w-[250px]">
+          <button
+            onClick={() => {
+              if (showSalesHistory) {
+                setShowSalesHistory(false);
+              } else {
+                fetchSalesHistory();
+                setShowSalesHistory(true);
+              }
+            }}
+            className="w-full border border-orange-400 text-orange-500 font-semibold py-3 rounded hover:bg-orange-50 transition"
+          >
+            {showSalesHistory ? "Back to POS" : "Sales History"}
+          </button>
+
+          {!showSalesHistory && (
+            <button
+              onClick={completePurchase}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded transition"
+            >
+              Complete Purchase
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 🟠 REFUND MODAL */}
+      {showRefundModal && selectedSale && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg border-2 border-orange-400 w-[90%] sm:w-[400px] text-center">
+            <h2 className="text-lg sm:text-xl font-bold mb-2 text-gray-800">
+              Admin Authorization Required
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Refunding this transaction requires admin approval.
             </p>
+
+            <div className="bg-orange-50 p-3 rounded-md mb-4">
+              <p className="font-semibold text-gray-800">
+                Product: {selectedSale.name}
+              </p>
+              <p className="text-gray-700">
+                💰 Total: ₱{(selectedSale.subtotal || 0).toLocaleString()}
+              </p>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Enter Admin Password
+            </label>
             <input
               type="password"
-              placeholder="Enter password"
+              className="w-full border-b-2 border-gray-300 focus:border-orange-400 outline-none px-2 py-2 mb-4 text-sm text-center"
+              placeholder="Enter Admin Password"
               value={adminPassword}
               onChange={(e) => setAdminPassword(e.target.value)}
-              className="w-full border p-2 rounded mb-4"
             />
-            <div className="flex gap-3">
+
+            <div className="flex justify-center gap-3">
               <button
                 onClick={confirmRefund}
-                className="flex-1 bg-green-600 text-white py-2 rounded"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold text-sm"
               >
-                Confirm
+                Confirm 
               </button>
               <button
-                onClick={() => {
-                  setShowAdminPrompt(false);
-                  setAdminPassword("");
-                  setSelectedSale(null);
-                }}
-                className="flex-1 bg-gray-300 py-2 rounded"
+                onClick={() => setShowRefundModal(false)}
+                className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-6 py-2 rounded font-semibold text-sm"
               >
                 Cancel
               </button>
