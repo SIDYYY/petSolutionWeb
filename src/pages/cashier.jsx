@@ -12,7 +12,6 @@ import { db } from "../../firebase";
 import { Search, Trash2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
-
 export default function Cashier() {
   const [search, setSearch] = useState("");
   const [allProducts, setAllProducts] = useState([]);
@@ -24,19 +23,21 @@ export default function Cashier() {
   const [showSalesHistory, setShowSalesHistory] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
+  const [selectedRefundItems, setSelectedRefundItems] = useState([]);
   const [adminPassword, setAdminPassword] = useState("");
   const searchRef = useRef(null);
   const location = useLocation();
 
+  // ✅ Handle ?view=sales link
   useEffect(() => {
-  const query = new URLSearchParams(location.search);
-  if (query.get("view") === "sales") {
-    fetchSalesHistory(); // Load sales
-    setShowSalesHistory(true); // Show sales history immediately
-  }
-}, [location]);
+    const query = new URLSearchParams(location.search);
+    if (query.get("view") === "sales") {
+      fetchSalesHistory();
+      setShowSalesHistory(true);
+    }
+  }, [location]);
 
-  // ✅ FETCH PRODUCTS
+  // ✅ Fetch products
   useEffect(() => {
     const fetchProducts = async () => {
       const snap = await getDocs(collection(db, "products"));
@@ -46,36 +47,15 @@ export default function Cashier() {
     fetchProducts();
   }, []);
 
-  // ✅ FETCH SALES HISTORY
+  // ✅ Fetch sales history
   const fetchSalesHistory = async () => {
     const snap = await getDocs(collection(db, "sales_history"));
     const sales = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-    // 🔥 Flatten all sales into individual product rows
-    let flattened = [];
-    sales.forEach((sale) => {
-      if (Array.isArray(sale.items)) {
-        sale.items.forEach((item) => {
-          flattened.push({
-            saleId: sale.id,
-            date: sale.createdAt?.seconds
-              ? new Date(sale.createdAt.seconds * 1000).toLocaleString()
-              : "—",
-            name: item.name,
-            qty: item.qty,
-            subtotal: item.subtotal || item.price * item.qty,
-            status: sale.status || "completed",
-          });
-        });
-      }
-    });
-
-    // Sort by most recent
-    flattened.sort((a, b) => new Date(b.date) - new Date(a.date));
-    setSalesHistory(flattened);
+    sales.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    setSalesHistory(sales);
   };
 
-  // ✅ SEARCH PRODUCTS
+  // ✅ Search logic
   useEffect(() => {
     if (!search.trim()) return setProducts([]);
     const keywords = search.toLowerCase().split(" ").filter(Boolean);
@@ -100,7 +80,7 @@ export default function Cashier() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ✅ ADD TO CART
+  // ✅ Add to cart
   const addToCart = (product) => {
     if (product.qty <= 0) return setMessage("❌ No stock available!");
     setCart((prev) => {
@@ -118,12 +98,12 @@ export default function Cashier() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
-    setShowDropdown(false);
     setSearch("");
+    setShowDropdown(false);
     setMessage(null);
   };
 
-  // ✅ UPDATE QUANTITY
+  // ✅ Update qty in cart
   const updateQuantity = (id, change) => {
     setCart((prev) =>
       prev.map((item) => {
@@ -141,15 +121,13 @@ export default function Cashier() {
     );
   };
 
-  // ✅ REMOVE FROM CART
-  const removeFromCart = (id) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
+  // ✅ Remove from cart
+  const removeFromCart = (id) => setCart((prev) => prev.filter((i) => i.id !== id));
 
-  // ✅ COMPLETE PURCHASE
+  // ✅ Complete purchase
   const completePurchase = async () => {
     if (cart.length === 0) {
-      setMessage("⚠️ No products in cart! Please add an item first.");
+      setMessage("⚠️ No products in cart!");
       setTimeout(() => setMessage(null), 3000);
       return;
     }
@@ -173,6 +151,7 @@ export default function Cashier() {
         qty: i.quantity,
         price: i.price,
         subtotal: i.price * i.quantity,
+        refundedQty: 0,
       }));
       const total = saleItems.reduce((s, i) => s + i.subtotal, 0);
       await addDoc(collection(db, "sales_history"), {
@@ -182,6 +161,7 @@ export default function Cashier() {
         status: "completed",
         createdAt: serverTimestamp(),
       });
+
       setCart([]);
       setMessage("✅ Purchase completed!");
     } catch (err) {
@@ -190,12 +170,13 @@ export default function Cashier() {
     }
   };
 
-  // ✅ REFUND HANDLER (MODAL)
+  // ✅ Open refund modal
   const openRefundModal = (sale) => {
     setSelectedSale(sale);
     setShowRefundModal(true);
   };
 
+  // ✅ Confirm refund
   const confirmRefund = async () => {
     if (adminPassword !== "admin123") {
       setMessage("❌ Incorrect admin password!");
@@ -204,15 +185,62 @@ export default function Cashier() {
     }
 
     try {
-      const saleRef = doc(db, "sales_history", selectedSale.saleId);
-      await updateDoc(saleRef, { status: "refunded" });
-      fetchSalesHistory();
+      const saleRef = doc(db, "sales_history", selectedSale.id);
+      const updatedItems = [];
+
+      for (const item of selectedSale.items) {
+        const refundData = selectedRefundItems.find(
+          (r) => r.uniqueId === `${selectedSale.id}_${item.productId}`
+        );
+
+        if (refundData) {
+          const refundQty = Math.min(
+            refundData.refundQty,
+            item.qty - (item.refundedQty || 0)
+          );
+
+          if (refundQty > 0) {
+            const productRef = doc(db, "products", item.productId);
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+              const stock = productSnap.data().qty || 0;
+              await updateDoc(productRef, { qty: stock + refundQty });
+            }
+
+            const newRefundedQty = (item.refundedQty || 0) + refundQty;
+
+            updatedItems.push({
+              ...item,
+              refundedQty: newRefundedQty,
+            });
+          } else {
+            updatedItems.push(item);
+          }
+        } else {
+          updatedItems.push(item);
+        }
+      }
+
+      const allRefunded = updatedItems.every(
+        (i) => (i.refundedQty || 0) >= i.qty
+      );
+      const newStatus = allRefunded ? "refunded" : "partially_refunded";
+
+      await updateDoc(saleRef, {
+        items: updatedItems,
+        status: newStatus,
+        refundDate: serverTimestamp(),
+      });
+
+      setMessage("✅ Partial refund processed!");
       setShowRefundModal(false);
       setAdminPassword("");
-      setMessage("✅ Sale refunded successfully!");
+      setSelectedRefundItems([]);
+      fetchSalesHistory();
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
-      setMessage("❌ Failed to refund sale.");
+      console.error("Refund error:", error);
+      setMessage("❌ Failed to process refund.");
       setTimeout(() => setMessage(null), 3000);
     }
   };
@@ -220,13 +248,13 @@ export default function Cashier() {
   const totalPrice = cart.reduce((s, i) => s + (i.price || 0) * i.quantity, 0);
 
   return (
-    <div className="h-full w-full bg-white flex flex-col lg:flex-row justify-between items-start p-3 sm:p-4 md:p-6 overflow-hidden">
-      {/* ✅ MESSAGE POPUP */}
+    <div className="h-full w-full bg-white flex flex-col lg:flex-row justify-between items-start p-3 sm:p-4 md:p-6">
+      {/* ✅ Message */}
       {message && (
         <div
-          className={`fixed top-6 right-6 z-50 flex items-start gap-3 border-l-4 rounded-md shadow-lg p-4 w-[300px] 
-          ${message.includes("✅") ? "border-green-600 bg-green-50 text-green-800" : ""} 
-          ${message.includes("❌") ? "border-red-600 bg-red-50 text-red-800" : ""} 
+          className={`fixed top-6 right-6 z-50 flex items-start gap-3 border-l-4 rounded-md shadow-lg p-4 w-[300px]
+          ${message.includes("✅") ? "border-green-600 bg-green-50 text-green-800" : ""}
+          ${message.includes("❌") ? "border-red-600 bg-red-50 text-red-800" : ""}
           ${message.includes("⚠️") ? "border-yellow-500 bg-yellow-50 text-yellow-800" : ""}`}
         >
           <div className="flex-1">
@@ -248,10 +276,10 @@ export default function Cashier() {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row w-full gap-4 overflow-hidden">
-        {/* ✅ LEFT SIDE TABLE */}
-        <div className="flex-1 border border-orange-300 rounded-md bg-white shadow-sm flex flex-col overflow-hidden">
-
+      <div className="flex flex-col lg:flex-row w-full gap-4">
+        {/* ✅ POS / History */}
+        <div className="flex-1 border border-orange-300 rounded-md bg-white shadow-sm flex flex-col">
+          {/* ✅ Search bar */}
           {!showSalesHistory && (
             <div ref={searchRef} className="relative p-3 sm:p-4 border-b border-orange-200">
               <div className="flex items-center gap-2 border border-orange-300 bg-orange-50 rounded-md px-3 py-2">
@@ -280,30 +308,13 @@ export default function Cashier() {
               )}
             </div>
           )}
-          
-          {/* ✅ TABLE HEADER */}
-          <div className="hidden sm:grid grid-cols-12 font-semibold text-orange-500 border-b border-orange-300 px-4 py-2 text-xs sm:text-sm">
-            {!showSalesHistory ? (
-              <>
-                <div className="col-span-5">Product name</div>
-                <div className="col-span-2 text-center">Qty</div>
-                <div className="col-span-2 text-right">Price</div>
-                <div className="col-span-2 text-right">Amount</div>
-                <div className="col-span-1"></div>
-              </>
-            ) : (
-              <>
-                <div className="col-span-3">Date</div>
-                <div className="col-span-3 text-left">Product</div>
-                <div className="col-span-2 text-center">Qty</div>
-                <div className="col-span-2 text-right">Total</div>
-                <div className="col-span-2 text-center">Action</div>
-              </>
-            )}
-          </div>
 
-          {/* ✅ TABLE BODY */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+          {/* ✅ Main body */}
+          <div
+            className={`flex-1 p-3 sm:p-4 ${
+              showSalesHistory ? "overflow-y-auto max-h-[70vh] pr-2" : "overflow-y-auto"
+            }`}
+          >
             {!showSalesHistory ? (
               cart.length === 0 ? (
                 <div className="text-center text-gray-400 py-24 text-sm">
@@ -316,13 +327,13 @@ export default function Cashier() {
                 cart.map((item) => (
                   <div
                     key={item.id}
-                    className="grid grid-cols-2 sm:grid-cols-12 items-center py-2 border-b last:border-b-0 text-sm"
+                    className="grid grid-cols-2 sm:grid-cols-12 items-center py-2 border-b text-sm"
                   >
-                    <div className="sm:col-span-5 text-left">
+                    <div className="sm:col-span-5">
                       <div className="font-medium text-gray-700">{item.name}</div>
                       <div className="text-xs text-gray-400">Stock: {item.qty}</div>
                     </div>
-                    <div className="flex sm:col-span-2 justify-center items-center gap-2 mt-2 sm:mt-0">
+                    <div className="flex sm:col-span-2 justify-center items-center gap-2">
                       <button
                         onClick={() => updateQuantity(item.id, -1)}
                         className="bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200"
@@ -357,28 +368,153 @@ export default function Cashier() {
                 ))
               )
             ) : (
-              salesHistory.map((sale, index) => (
+              // ✅ SALES HISTORY
+              salesHistory.map((sale) => (
                 <div
-                  key={index}
-                  className="grid grid-cols-1 sm:grid-cols-12 items-center py-2 border-b text-xs sm:text-sm"
+                  key={sale.id}
+                  className="border border-orange-300 rounded-md mb-4 p-3 bg-orange-50"
                 >
-                  <div className="sm:col-span-3">{sale.date}</div>
-                  <div className="sm:col-span-3 text-left">{sale.name}</div>
-                  <div className="sm:col-span-2 text-center">{sale.qty}</div>
-                  <div className="sm:col-span-2 text-right">
-                    ₱{sale.subtotal?.toFixed(2) || 0}
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-semibold text-gray-700">
+                      🧾{" "}
+                      {sale.createdAt?.seconds
+                        ? new Date(sale.createdAt.seconds * 1000).toLocaleString()
+                        : "—"}
+                    </span>
+                    <span
+                      className={`text-sm font-semibold ${
+                        sale.status === "refunded"
+                          ? "text-red-600"
+                          : sale.status === "partially_refunded"
+                          ? "text-yellow-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {sale.status.replace("_", " ")}
+                    </span>
                   </div>
-                  <div className="sm:col-span-2 text-center">
-                    {sale.status === "completed" ? (
-                      <button
-                        onClick={() => openRefundModal(sale)}
-                        className="text-orange-500 hover:text-orange-700 font-medium"
-                      >
-                        Refund
-                      </button>
-                    ) : (
-                      <span className="text-red-500 font-semibold">Refunded</span>
-                    )}
+
+                  <div className="space-y-1 mb-2">
+                    {sale.items.map((item) => {
+                      const uniqueId = `${sale.id}_${item.productId}`;
+                      const refundedQty = item.refundedQty || 0;
+                      const remainingQty = item.qty - refundedQty;
+                      const alreadyRefunded = remainingQty <= 0;
+                      const selectedItem = selectedRefundItems.find(
+                        (r) => r.uniqueId === uniqueId
+                      );
+
+                      return (
+                        <div
+                          key={uniqueId}
+                          className={`flex justify-between items-center bg-white rounded p-2 text-sm transition ${
+                            alreadyRefunded
+                              ? "opacity-60 line-through cursor-not-allowed"
+                              : "hover:bg-orange-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {/* 🟠 Hide checkbox if refunded */}
+                            <input
+                            type="checkbox"
+                            disabled={alreadyRefunded}
+                            checked={!!selectedItem && !alreadyRefunded}
+                            onChange={(e) => {
+                              if (alreadyRefunded) return; // safety
+                              if (e.target.checked) {
+                                setSelectedRefundItems((prev) => [
+                                  ...prev,
+                                  { ...item, uniqueId, refundQty: 1 },
+                                ]);
+                              } else {
+                                setSelectedRefundItems((prev) =>
+                                  prev.filter((r) => r.uniqueId !== uniqueId)
+                                );
+                              }
+                            }}
+                            className={`h-4 w-4 accent-orange-500 ${
+                              alreadyRefunded ? "opacity-50 cursor-not-allowed" : ""
+                            }`}
+                          />
+
+
+                            <div>
+                              <p
+                                className={`font-medium text-gray-700 ${
+                                  alreadyRefunded
+                                    ? "opacity-60 line-through text-gray-500"
+                                    : ""
+                                }`}
+                              >
+                                {item.name} (x{remainingQty})
+                              </p>
+                              {refundedQty > 0 && (
+                                <p className="text-xs text-gray-500">
+                                  ({refundedQty} refunded)
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {selectedItem && !alreadyRefunded && remainingQty > 1 && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() =>
+                                    setSelectedRefundItems((prev) =>
+                                      prev.map((r) =>
+                                        r.uniqueId === uniqueId && r.refundQty > 1
+                                          ? { ...r, refundQty: r.refundQty - 1 }
+                                          : r
+                                      )
+                                    )
+                                  }
+                                  className="bg-orange-100 px-2 rounded hover:bg-orange-200"
+                                >
+                                  –
+                                </button>
+                                <span className="w-5 text-center text-sm font-medium">
+                                  {selectedItem.refundQty}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setSelectedRefundItems((prev) =>
+                                      prev.map((r) =>
+                                        r.uniqueId === uniqueId && r.refundQty < remainingQty
+                                          ? { ...r, refundQty: r.refundQty + 1 }
+                                          : r
+                                      )
+                                    )
+                                  }
+                                  className="bg-orange-100 px-2 rounded hover:bg-orange-200"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            )}
+                            <span className="text-gray-700 font-semibold">
+                              ₱{item.subtotal.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-right">
+                    <button
+                      onClick={() => openRefundModal(sale)}
+                      disabled={sale.status === "refunded"}
+                      className={`font-semibold text-sm px-3 py-1 rounded ${
+                        sale.status === "refunded"
+                          ? "text-gray-400 cursor-not-allowed"
+                          : "text-orange-600 hover:text-orange-800"
+                      }`}
+                    >
+                      {sale.status === "refunded"
+                        ? "Already Refunded"
+                        : "Refund Selected"}
+                    </button>
                   </div>
                 </div>
               ))
@@ -395,7 +531,7 @@ export default function Cashier() {
           )}
         </div>
 
-        {/* ✅ BUTTONS */}
+        {/* ✅ Right Buttons */}
         <div className="flex flex-wrap lg:flex-col justify-center lg:justify-start items-stretch gap-3 mt-4 lg:mt-0 w-full lg:w-[250px]">
           <button
             onClick={() => {
@@ -422,8 +558,8 @@ export default function Cashier() {
         </div>
       </div>
 
-      {/* 🟠 REFUND MODAL */}
-      {showRefundModal && selectedSale && (
+      {/* 🟠 Refund Modal */}
+      {showRefundModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg border-2 border-orange-400 w-[90%] sm:w-[400px] text-center">
             <h2 className="text-lg sm:text-xl font-bold mb-2 text-gray-800">
@@ -434,12 +570,32 @@ export default function Cashier() {
             </p>
 
             <div className="bg-orange-50 p-3 rounded-md mb-4">
-              <p className="font-semibold text-gray-800">
-                Product: {selectedSale.name}
+              <p className="font-semibold text-gray-800 mb-2">
+                Selected Refund Items:
               </p>
-              <p className="text-gray-700">
-                💰 Total: ₱{(selectedSale.subtotal || 0).toLocaleString()}
-              </p>
+
+              {selectedRefundItems.length === 0 ? (
+                <p className="text-gray-600 text-sm">No items selected.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {selectedRefundItems.map((r, idx) => (
+                    <li
+                      key={idx}
+                      className="flex justify-between items-center bg-white px-3 py-2 rounded-md shadow-sm border border-orange-200"
+                    >
+                      <div className="text-left">
+                        <p className="text-gray-800 font-medium text-sm">{r.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {r.refundQty} pcs × ₱{r.price.toLocaleString()}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-orange-600">
+                        ₱{(r.price * r.refundQty).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -458,7 +614,7 @@ export default function Cashier() {
                 onClick={confirmRefund}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold text-sm"
               >
-                Confirm 
+                Confirm
               </button>
               <button
                 onClick={() => setShowRefundModal(false)}
