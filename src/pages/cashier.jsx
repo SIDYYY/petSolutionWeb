@@ -197,72 +197,87 @@ export default function Cashier() {
 
   // ✅ Confirm refund
   const confirmRefund = async () => {
-    if (adminPassword !== "admin123") {
+  try {
+    // 1️⃣ Fetch the admin password from Firestore
+    const docRef = doc(db, "adminAccess", "access_control");
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      setMessage("❌ Admin access configuration not found!");
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
+
+    const firestorePassword = docSnap.data().password;
+
+    // 2️⃣ Verify entered admin password
+    if (adminPassword !== firestorePassword) {
       setMessage("❌ Incorrect admin password!");
       setTimeout(() => setMessage(null), 3000);
       return;
     }
 
-    try {
-      const saleRef = doc(db, "sales_history", selectedSale.id);
-      const updatedItems = [];
+    // 3️⃣ Proceed with refund logic
+    const saleRef = doc(db, "sales_history", selectedSale.id);
+    const updatedItems = [];
 
-      for (const item of selectedSale.items) {
-        const refundData = selectedRefundItems.find(
-          (r) => r.uniqueId === `${selectedSale.id}_${item.productId}`
+    for (const item of selectedSale.items) {
+      const refundData = selectedRefundItems.find(
+        (r) => r.uniqueId === `${selectedSale.id}_${item.productId}`
+      );
+
+      if (refundData) {
+        const refundQty = Math.min(
+          refundData.refundQty,
+          item.qty - (item.refundedQty || 0)
         );
 
-        if (refundData) {
-          const refundQty = Math.min(
-            refundData.refundQty,
-            item.qty - (item.refundedQty || 0)
-          );
-
-          if (refundQty > 0) {
-            const productRef = doc(db, "products", item.productId);
-            const productSnap = await getDoc(productRef);
-            if (productSnap.exists()) {
-              const stock = productSnap.data().qty || 0;
-              await updateDoc(productRef, { qty: stock + refundQty });
-            }
-
-            const newRefundedQty = (item.refundedQty || 0) + refundQty;
-
-            updatedItems.push({
-              ...item,
-              refundedQty: newRefundedQty,
-            });
-          } else {
-            updatedItems.push(item);
+        if (refundQty > 0) {
+          const productRef = doc(db, "products", item.productId);
+          const productSnap = await getDoc(productRef);
+          if (productSnap.exists()) {
+            const stock = productSnap.data().qty || 0;
+            await updateDoc(productRef, { qty: stock + refundQty });
           }
+
+          const newRefundedQty = (item.refundedQty || 0) + refundQty;
+
+          updatedItems.push({
+            ...item,
+            refundedQty: newRefundedQty,
+          });
         } else {
           updatedItems.push(item);
         }
+      } else {
+        updatedItems.push(item);
       }
-
-      const allRefunded = updatedItems.every(
-        (i) => (i.refundedQty || 0) >= i.qty
-      );
-      const newStatus = allRefunded ? "refunded" : "partially_refunded";
-
-      await updateDoc(saleRef, {
-        items: updatedItems,
-        status: newStatus,
-        refundDate: serverTimestamp(),
-      });
-
-      setMessage("✅ Partial refund processed!");
-      setShowRefundModal(false);
-      setAdminPassword("");
-      setSelectedRefundItems([]);
-      fetchSalesHistory();
-      setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
-      console.error("Refund error:", error);
-      setMessage("❌ Failed to process refund.");
-      setTimeout(() => setMessage(null), 3000);
     }
-  };
+
+    const allRefunded = updatedItems.every(
+      (i) => (i.refundedQty || 0) >= i.qty
+    );
+    const newStatus = allRefunded ? "refunded" : "partially_refunded";
+
+    await updateDoc(saleRef, {
+      items: updatedItems,
+      status: newStatus,
+      refundDate: serverTimestamp(),
+    });
+
+    setMessage("✅ Partial refund processed!");
+    setShowRefundModal(false);
+    setAdminPassword("");
+    setSelectedRefundItems([]);
+    fetchSalesHistory();
+    setTimeout(() => setMessage(null), 3000);
+  } catch (error) {
+    console.error("Refund error:", error);
+    setMessage("❌ Failed to process refund.");
+    setTimeout(() => setMessage(null), 3000);
+  }
+};
+
 
   const totalPrice = cart.reduce((s, i) => s + (i.price || 0) * i.quantity, 0);
 
