@@ -1,33 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "../../firebase"; 
+import { db } from "../../firebase"; 
+import { doc, getDoc } from "firebase/firestore";
 
 export default function IntroLock({ onAccess }) {
   const [input, setInput] = useState("");
   const [storedPassword, setStoredPassword] = useState("");
   const [error, setError] = useState("");
 
-  const db = getFirestore(app);
-
-  // Fetch current password from Firestore
   useEffect(() => {
     const fetchPassword = async () => {
-      const docRef = doc(db, "settings", "access_control");
+      const docRef = doc(db, "adminAccess", "access_control");
       const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setStoredPassword(docSnap.data().password);
-      }
+      if (docSnap.exists()) setStoredPassword(docSnap.data().password);
     };
     fetchPassword();
   }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (input === storedPassword) {
-      onAccess();
-    } else {
-      setError("Incorrect password");
-    }
+    if (input === storedPassword) onAccess();
+    else setError("Incorrect password");
   };
 
   return (

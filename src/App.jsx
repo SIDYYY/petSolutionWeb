@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "../firebase"; 
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase"; 
 
 import Sidebar from "./components/sideBar";
 import Dashboard from "./pages/dashboard";
@@ -36,8 +36,6 @@ export default function App() {
   const [isInventoryUnlocked, setIsInventoryUnlocked] = useState(false);
   const [isAccessGranted, setIsAccessGranted] = useState(false);
   const [storedPassword, setStoredPassword] = useState("");
-
-  const db = getFirestore(app);
 
   // Fetch the password from Firestore
   useEffect(() => {

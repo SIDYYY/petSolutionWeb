@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
-import { app } from "../../firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase"; 
 
 export default function ChangePasswordWithMasterPin() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -11,8 +11,7 @@ export default function ChangePasswordWithMasterPin() {
   const [masterPin, setMasterPin] = useState("");
   const [message, setMessage] = useState("");
 
-  const db = getFirestore(app);
-  const docRef = doc(db, "adminAccess", "access_control");
+  const docRef = doc(db, "adminAccess", "access_control"); // ✅ use db directly
 
   // Fetch current password & master PIN from Firestore
   useEffect(() => {
