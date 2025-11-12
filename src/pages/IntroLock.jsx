@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebase"; 
 import { doc, getDoc } from "firebase/firestore";
-import logo from "../assets/petsolution.png"; 
-import { FaPaw } from "react-icons/fa";
+import logo from "../assets/petsolution.png"; // logo import
 
 export default function IntroLock({ onAccess }) {
   const [input, setInput] = useState("");
@@ -29,24 +28,16 @@ export default function IntroLock({ onAccess }) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-pink-50">
-      {/* Cute paw icons floating around */}
-      <div className="absolute top-10 left-10 text-yellow-400 animate-bounce">
-        <FaPaw size={24} />
-      </div>
-      <div className="absolute top-20 right-20 text-blue-300 animate-bounce delay-200">
-        <FaPaw size={20} />
-      </div>
-
+    <div className="flex flex-col items-center justify-center h-screen" style={{ backgroundColor: "#FF9500" }}>
       {/* Logo */}
       <img
         src={logo}
         alt="PetSolution Logo"
-        className="h-28 w-auto mb-4 drop-shadow-lg animate-bounce"
+        className="h-28 w-auto mb-6 drop-shadow-lg"
       />
 
       {/* Friendly title */}
-      <h1 className="text-3xl font-bold mb-6 text-pink-400 text-center">
+      <h1 className="text-3xl font-bold mb-6 text-white text-center">
         Welcome to PetSolution 🐶🐱
       </h1>
 
@@ -57,18 +48,18 @@ export default function IntroLock({ onAccess }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Enter password"
-          className="p-3 w-full border border-pink-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400 text-center placeholder-pink-200"
+          className="p-3 w-full border border-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-white text-center placeholder-white"
         />
         <button
           type="submit"
-          className="w-full py-3 bg-yellow-300 text-pink-500 font-bold rounded-2xl hover:bg-yellow-400 hover:scale-105 transition transform"
+          className="w-full py-3 bg-white text-orange-500 font-bold rounded-2xl hover:bg-gray-100 transition transform"
         >
           Unlock 🐾
         </button>
       </form>
 
       {/* Error message */}
-      {error && <p className="text-red-400 mt-4 font-semibold text-center">{error}</p>}
+      {error && <p className="text-red-600 mt-4 font-semibold text-center">{error}</p>}
     </div>
   );
 }
