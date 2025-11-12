@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
-import { app } from "../firebase";
+import { app } from "../../firebase";
 
 export default function ChangePasswordWithMasterPin() {
   const [currentPassword, setCurrentPassword] = useState("");

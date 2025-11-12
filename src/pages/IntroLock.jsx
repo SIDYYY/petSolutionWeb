@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "../firebase"; // Your firebase config
+import { app } from "../../firebase"; 
 
 export default function IntroLock({ onAccess }) {
   const [input, setInput] = useState("");
