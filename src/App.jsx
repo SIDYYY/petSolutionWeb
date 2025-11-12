@@ -1,5 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { app } from "./firebase"; 
 
 import Sidebar from "./components/sideBar";
 import Dashboard from "./pages/dashboard";
@@ -11,6 +14,8 @@ import UpdateProduct from "./pages/manage/updateProduct";
 import Reports from "./pages/reports";
 import Settings from "./pages/settings";
 import Cashier from "./pages/cashier";
+import IntroLock from "./pages/IntroLock";
+import AdminPass from "./pages/adminPass";
 
 function PrivateLayout({ isInventoryUnlocked, onUnlock, onLock }) {
   return (
@@ -29,10 +34,32 @@ function PrivateLayout({ isInventoryUnlocked, onUnlock, onLock }) {
 
 export default function App() {
   const [isInventoryUnlocked, setIsInventoryUnlocked] = useState(false);
+  const [isAccessGranted, setIsAccessGranted] = useState(false);
+  const [storedPassword, setStoredPassword] = useState("");
 
-  // Unlock with password
+  const db = getFirestore(app);
+
+  // Fetch the password from Firestore
+  useEffect(() => {
+    const fetchPassword = async () => {
+      try {
+        const docRef = doc(db, "adminAccess", "access_control");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setStoredPassword(docSnap.data().password);
+        } else {
+          console.error("No access_control document found in adminAccess!");
+        }
+      } catch (error) {
+        console.error("Error fetching password:", error);
+      }
+    };
+    fetchPassword();
+  }, []);
+
+  // Unlock with password from Firestore
   const handleUnlock = (password) => {
-    if (password === "admin123") {
+    if (password === storedPassword) {
       setIsInventoryUnlocked(true);
       return true;
     }
@@ -43,6 +70,11 @@ export default function App() {
   const handleLock = () => {
     setIsInventoryUnlocked(false);
   };
+
+  // Show IntroLock until access is granted
+  if (!isAccessGranted) {
+    return <IntroLock onAccess={() => setIsAccessGranted(true)} />;
+  }
 
   return (
     <Routes>
@@ -60,7 +92,8 @@ export default function App() {
         <Route path="products" element={<Products />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="cashier" element={<Cashier/>}/>
+        <Route path="cashier" element={<Cashier />} />
+        <Route path="adminPass" element={<AdminPass />} />
 
         {/* CRUD routes only available if unlocked */}
         {isInventoryUnlocked && (
