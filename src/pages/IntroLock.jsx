@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebase"; 
 import { doc, getDoc } from "firebase/firestore";
-import logo from "../../assets/petsolution.png"; // logo import
-import { FaPaw } from "react-icons/fa"; // paw icons
+import logo from "../assets/petsolution.png"; 
+import { FaPaw } from "react-icons/fa";
 
 export default function IntroLock({ onAccess }) {
   const [input, setInput] = useState("");
