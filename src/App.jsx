@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from "./firebase"; 
+import { app } from "../firebase"; 
 
 import Sidebar from "./components/sideBar";
 import Dashboard from "./pages/dashboard";
