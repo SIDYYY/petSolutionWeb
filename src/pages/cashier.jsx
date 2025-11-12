@@ -18,6 +18,10 @@ export default function Cashier() {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [salesHistory, setSalesHistory] = useState([]);
+  const [cashReceived, setCashReceived] = useState(0);
+  const [changeDue, setChangeDue] = useState(0);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+
   const [message, setMessage] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
@@ -124,51 +128,66 @@ export default function Cashier() {
   // ✅ Remove from cart
   const removeFromCart = (id) => setCart((prev) => prev.filter((i) => i.id !== id));
 
-  // ✅ Complete purchase
-  const completePurchase = async () => {
-    if (cart.length === 0) {
-      setMessage("⚠️ No products in cart!");
-      setTimeout(() => setMessage(null), 3000);
-      return;
-    }
+  // ✅ handle complete purchase
+  const completePurchase = () => {
+  if (cart.length === 0) {
+    setMessage("⚠️ No products in cart!");
+    setTimeout(() => setMessage(null), 3000);
+    return;
+  }
+  const cash = Number(cashReceived); // ensure number
 
-    try {
-      const monthKey = new Date().toISOString().slice(0, 7);
-      for (const item of cart) {
-        const ref = doc(db, "products", item.id);
-        const snap = await getDoc(ref);
-        const current = snap.data();
-        await updateDoc(ref, {
-          qty: current.qty - item.quantity,
-          [`monthlySales.${monthKey}`]:
-            (current.monthlySales?.[monthKey] || 0) + item.quantity,
-        });
-      }
+  if (cashReceived < totalPrice) {
+    setMessage("❌ Cash received is less than total!");
+    setTimeout(() => setMessage(null), 3000);
+    return;
+  }
 
-      const saleItems = cart.map((i) => ({
-        productId: i.id,
-        name: i.name,
-        qty: i.quantity,
-        price: i.price,
-        subtotal: i.price * i.quantity,
-        refundedQty: 0,
-      }));
-      const total = saleItems.reduce((s, i) => s + i.subtotal, 0);
-      await addDoc(collection(db, "sales_history"), {
-        items: saleItems,
-        total,
-        month: monthKey,
-        status: "completed",
-        createdAt: serverTimestamp(),
+  const change = cashReceived - totalPrice;
+  setChangeDue(change);
+  setShowChangeModal(true); // open confirmation modal
+};
+
+  // Finalize sale after changed given
+  const finalizeSale = async () => {
+  try {
+    const monthKey = new Date().toISOString().slice(0, 7);
+    for (const item of cart) {
+      const ref = doc(db, "products", item.id);
+      const snap = await getDoc(ref);
+      const current = snap.data();
+      await updateDoc(ref, {
+        qty: current.qty - item.quantity,
+        [`monthlySales.${monthKey}`]:
+          (current.monthlySales?.[monthKey] || 0) + item.quantity,
       });
-
-      setCart([]);
-      setMessage("✅ Purchase completed!");
-    } catch (err) {
-      console.error(err);
-      setMessage("❌ Error completing purchase.");
     }
-  };
+
+    const saleItems = cart.map((i) => ({
+      productId: i.id,
+      name: i.name,
+      qty: i.quantity,
+      price: i.price,
+      subtotal: i.price * i.quantity,
+      refundedQty: 0,
+    }));
+    const total = saleItems.reduce((s, i) => s + i.subtotal, 0);
+    await addDoc(collection(db, "sales_history"), {
+      items: saleItems,
+      total,
+      month: monthKey,
+      status: "completed",
+      createdAt: serverTimestamp(),
+    });
+
+    setCart([]);
+    setMessage(`✅ Purchase completed! Change given: ₱${changeDue.toFixed(2)}`);
+  } catch (err) {
+    console.error(err);
+    setMessage("❌ Error completing purchase.");
+  }
+};
+
 
   // ✅ Open refund modal
   const openRefundModal = (sale) => {
@@ -246,6 +265,16 @@ export default function Cashier() {
   };
 
   const totalPrice = cart.reduce((s, i) => s + (i.price || 0) * i.quantity, 0);
+
+  useEffect(() => {
+  const cash = parseFloat(cashReceived);
+  if (!cash || cash < totalPrice) {
+    setChangeDue(0);
+  } else {
+    setChangeDue(cash - totalPrice);
+  }
+}, [cashReceived, totalPrice]);
+
 
   return (
     <div className="h-full w-full bg-white flex flex-col lg:flex-row justify-between items-start p-3 sm:p-4 md:p-6">
@@ -522,13 +551,39 @@ export default function Cashier() {
           </div>
 
           {!showSalesHistory && (
-            <div className="border-t border-orange-300 p-3 sm:p-4 text-right">
-              <div className="text-xs sm:text-sm text-gray-600">TOTAL</div>
-              <div className="text-lg sm:text-2xl font-bold text-gray-800">
-                ₱{totalPrice.toFixed(2)}
+              <div className="border-t border-gray-300 p-4 sm:p-6 bg-gray-50 rounded-t-md text-right space-y-3">
+                {/* Total */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm sm:text-base text-gray-600 font-medium">TOTAL</span>
+                  <span className="text-xl sm:text-2xl font-bold text-gray-900">
+                    ₱{totalPrice.toFixed(2)}
+                  </span>
+                </div>
+
+                {/* Cash Received & Change */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                    <label className="text-gray-700 text-sm font-medium">Cash Received:</label>
+                    <input
+                      type="number"
+                      placeholder="Enter amount"
+                      value={cashReceived}
+                      onChange={(e) => setCashReceived(Number(e.target.value))}
+                      className="border border-gray-300 rounded-md px-3 py-2 w-full sm:w-40 text-right focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col text-right">
+                    <span className="text-gray-700 text-sm font-medium">Change Due</span>
+                    <span className="text-lg sm:text-xl font-semibold text-gray-900">
+                      ₱{changeDue.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+
         </div>
 
         {/* ✅ Right Buttons */}
@@ -626,6 +681,51 @@ export default function Cashier() {
           </div>
         </div>
       )}
+
+      {showChangeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg border border-gray-300 w-[90%] sm:w-[400px] p-6 sm:p-8 text-center">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Confirm Customer Change</h2>
+            
+            <div className="space-y-2 mb-6 text-left">
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-700">Total:</span>
+                <span className="font-semibold text-gray-800">₱{totalPrice.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-gray-700">Cash Received:</span>
+                <span className="font-semibold text-gray-800">₱{Number(cashReceived).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2 mt-2">
+                <span className="font-medium text-gray-700">Change Due:</span>
+                <span className="font-semibold text-gray-800">₱{changeDue.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => {
+                  finalizeSale(); // call your original completePurchase logic
+                  setShowChangeModal(false);
+                  setCashReceived(0);
+                  setChangeDue(0);
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded transition"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setShowChangeModal(false)}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-6 py-2 rounded transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
