@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { Home, Box, PlusSquare, BarChart2, LogOut } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
+import logo from "../assets/petsolution.png";
 
 export default function Sidebar({ onUnlock }) {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ export default function Sidebar({ onUnlock }) {
     <>
       <aside className="w-64 bg-[#FF9500] shadow-md">
         <div className="p-4 text-2xl font-bold border-b flex flex-row gap-3 items-center ">
-          <img className="w-16 h-14" src="/petsolution.png" />
+          <img  src={logo} alt="Logo" className="w-16 h-14"/>
           <h3 className="text-2xl font-semibold text-white">Pet Solution</h3>
         </div>
         <nav className="p-4 space-y-2">
