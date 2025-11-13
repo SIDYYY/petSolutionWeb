@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+
 
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase"; 
@@ -75,6 +77,8 @@ export default function App() {
   }
 
   return (
+  <>
+  <Toaster position="top-center" reverseOrder={false} />
     <Routes>
       <Route
         element={
@@ -104,5 +108,6 @@ export default function App() {
         )}
       </Route>
     </Routes>
+    </>
   );
 }

@@ -1,26 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase"; 
+import { db } from "../../firebase";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
-export default function ChangePasswordWithMasterPin() {
+export default function ChangeAccess() {
+  const [mode, setMode] = useState("password"); // "password" or "masterPin"
   const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newMasterPin, setNewMasterPin] = useState("");
-  const [masterPinInput, setMasterPinInput] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [verifyMasterPin, setVerifyMasterPin] = useState("");
   const [storedPassword, setStoredPassword] = useState("");
-  const [masterPin, setMasterPin] = useState("");
-  const [message, setMessage] = useState("");
+  const [storedMasterPin, setStoredMasterPin] = useState("");
 
-  const docRef = doc(db, "adminAccess", "access_control"); // ✅ use db directly
+  const navigate = useNavigate();
+  const docRef = doc(db, "adminAccess", "access_control");
 
-  // Fetch current password & master PIN from Firestore
+  // Fetch stored credentials
   useEffect(() => {
     const fetchData = async () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
         setStoredPassword(data.password);
-        setMasterPin(data.master_pin);
+        setStoredMasterPin(data.master_pin);
       }
     };
     fetchData();
@@ -29,71 +31,110 @@ export default function ChangePasswordWithMasterPin() {
   const handleChange = async (e) => {
     e.preventDefault();
 
-    // Verify current password and master PIN
-    if (currentPassword !== storedPassword) {
-      setMessage("Current password is incorrect.");
-      return;
-    }
-    if (masterPinInput !== masterPin) {
-      setMessage("Master PIN is incorrect.");
-      return;
-    }
+    try {
+      if (mode === "password") {
+        if (currentPassword !== storedPassword) {
+          toast.error("❌ Current password is incorrect.");
+          return;
+        }
+        if (!verifyMasterPin || verifyMasterPin !== storedMasterPin) {
+          toast.error("❌ Master PIN verification failed.");
+          return;
+        }
+        await updateDoc(docRef, { password: newValue });
+        toast.success("✅ Admin password successfully updated!");
+      } else {
+        if (!verifyMasterPin || verifyMasterPin !== storedMasterPin) {
+          toast.error("❌ Current Master PIN is incorrect.");
+          return;
+        }
+        await updateDoc(docRef, { master_pin: newValue });
+        toast.success("✅ Master PIN successfully updated!");
+      }
 
-    // Update Firestore with new password and/or new master PIN
-    const updateData = {};
-    if (newPassword) updateData.password = newPassword;
-    if (newMasterPin) updateData.master_pin = newMasterPin;
+      // Reset fields
+      setCurrentPassword("");
+      setNewValue("");
+      setVerifyMasterPin("");
 
-    if (Object.keys(updateData).length === 0) {
-      setMessage("No changes detected.");
-      return;
+      // ✅ Go back to Manage Product page after short delay
+      setTimeout(() => {navigate("/dashboard", { state: { unlocked: true } });}, 1000);
+    } catch (error) {
+      toast.error("❌ An error occurred while updating credentials.");
     }
-
-    await updateDoc(docRef, updateData);
-    setMessage("Password and/or Master PIN successfully updated!");
-    setCurrentPassword("");
-    setNewPassword("");
-    setNewMasterPin("");
-    setMasterPinInput("");
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
-      <h1 className="text-2xl font-bold mb-4">Change Password & Master PIN</h1>
-      <form onSubmit={handleChange} className="flex flex-col gap-2 w-80">
-        <input
-          type="password"
-          placeholder="Current Password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          className="p-2 border rounded"
-        />
-        <input
-          type="password"
-          placeholder="New Password (optional)"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className="p-2 border rounded"
-        />
-        <input
-          type="password"
-          placeholder="New Master PIN (optional)"
-          value={newMasterPin}
-          onChange={(e) => setNewMasterPin(e.target.value)}
-          className="p-2 border rounded"
-        />
-        <input
-          type="password"
-          placeholder="Master PIN"
-          value={masterPinInput}
-          onChange={(e) => setMasterPinInput(e.target.value)}
-          className="p-2 border rounded"
-        />
-        <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded">
-          Update
-        </button>
-      </form>
-      {message && <p className="mt-2 text-blue-600">{message}</p>}
-    </div>
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 px-4">
+      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center text-orange-600 mb-6">
+          Change {mode === "password" ? "Password" : "Master PIN"}
+        </h1>
+
+        {/* Mode Selector */}
+        <div className="flex justify-center mb-6 space-x-3">
+          <button
+            onClick={() => setMode("password")}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              mode === "password"
+                ? "bg-orange-500 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            Password
+          </button>
+          <button
+            onClick={() => setMode("masterPin")}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              mode === "masterPin"
+                ? "bg-orange-500 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            Master PIN
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleChange} className="flex flex-col gap-4">
+          {mode === "password" && (
+            <input
+              type="password"
+              placeholder="Current Password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="p-3 border rounded-lg focus:ring-2 focus:ring-orange-400"
+            />
+          )}
+
+          <input
+            type="password"
+            placeholder={`New ${mode === "password" ? "Password" : "Master PIN"}`}
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            className="p-3 border rounded-lg focus:ring-2 focus:ring-orange-400"
+          />
+
+          <input
+            type="password"
+            placeholder={
+              mode === "password"
+                ? "Verify Master PIN"
+                : "Enter Current Master PIN"
+            }
+            value={verifyMasterPin}
+            onChange={(e) => setVerifyMasterPin(e.target.value)}
+            className="p-3 border rounded-lg focus:ring-2 focus:ring-orange-400"
+          />
+
+          <button
+            type="submit"
+            className="bg-orange-500 text-white font-semibold py-3 rounded-lg hover:bg-orange-600 transition"
+          >
+            Update {mode === "password" ? "Password" : "Master PIN"}
+          </button>
+        </form>
+      </div>
+    </div>  
   );
 }

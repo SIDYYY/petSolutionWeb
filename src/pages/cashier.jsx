@@ -11,6 +11,8 @@ import {
 import { db } from "../../firebase";
 import { Search, Trash2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import toast, { Toaster } from "react-hot-toast";
+
 
 export default function Cashier() {
   const [search, setSearch] = useState("");
@@ -91,7 +93,7 @@ export default function Cashier() {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
         if (existing.quantity >= product.qty) {
-          setMessage("❌ Not enough stock!");
+          toast.error("❌ Not enough stock!");
           return prev;
         }
         return prev.map((item) =>
@@ -131,16 +133,16 @@ export default function Cashier() {
   // ✅ handle complete purchase
   const completePurchase = () => {
   if (cart.length === 0) {
-    setMessage("⚠️ No products in cart!");
+      toast("⚠️ No products in cart!", { icon: "⚠️" });
     setTimeout(() => setMessage(null), 3000);
     return;
   }
   const cash = Number(cashReceived); // ensure number
 
   if (cashReceived < totalPrice) {
-    setMessage("❌ Cash received is less than total!");
-    setTimeout(() => setMessage(null), 3000);
-    return;
+      toast.error("❌ Cash received is less than total!");
+      setTimeout(() => setMessage(null), 3000);
+      return;
   }
 
   const change = cashReceived - totalPrice;
@@ -181,10 +183,10 @@ export default function Cashier() {
     });
 
     setCart([]);
-    setMessage(`✅ Purchase completed! Change given: ₱${changeDue.toFixed(2)}`);
+    toast.success(`Purchase completed! Change given: ₱${changeDue.toFixed(2)}`);
   } catch (err) {
     console.error(err);
-    setMessage("❌ Error completing purchase.");
+      toast.error("❌ Error completing purchase.");
   }
 };
 
@@ -208,7 +210,7 @@ export default function Cashier() {
       return;
     }
 
-    const firestorePassword = docSnap.data().password;
+    const firestorePassword = docSnap.data().master_pin;
 
     // 2️⃣ Verify entered admin password
     if (adminPassword !== firestorePassword) {
@@ -669,7 +671,7 @@ export default function Cashier() {
             </div>
 
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Enter Admin Password
+              Enter Master PIN
             </label>
             <input
               type="password"

@@ -1,11 +1,19 @@
-import React, { useState } from "react";
-import { PlusCircle, Edit, Layers, BarChart3 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { PlusCircle, Edit, Layers, BarChart3, KeyRound } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function ManageProduct() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.unlocked) {
+      // temporarily allow access
+      console.log("Temporarily unlocked for return from ChangeAccess");
+    }
+  }, [location]);
 
   const handleFinish = () => {
     navigate("/dashboard");
@@ -111,6 +119,25 @@ export default function ManageProduct() {
             </p>
           </div>
         </Link>
+
+        {/* 🔐 Admin Password Management */}
+        <Link
+          to="/adminPass"
+          className="bg-white border border-gray-200 p-8 rounded-2xl shadow-sm hover:shadow-lg hover:border-orange-400 transition group"
+        >
+          <div className="flex flex-col items-center space-y-3">
+            <KeyRound
+              className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
+              size={40}
+            />
+            <span className="text-lg font-semibold text-gray-800 group-hover:text-orange-600">
+              Change Admin Password
+            </span>
+            <p className="text-sm text-gray-500 text-center">
+              Update the admin access password securely from here.
+            </p>
+          </div>
+        </Link>
       </div>
 
       {/* Inventory Analysis Section */}
@@ -136,7 +163,6 @@ export default function ManageProduct() {
           </button>
         </div>
       </div>
-
     </div>
   );
 }
