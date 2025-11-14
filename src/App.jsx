@@ -46,7 +46,7 @@ export default function App() {
         const docRef = doc(db, "adminAccess", "access_control");
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setStoredPassword(docSnap.data().password);
+          setStoredPassword(docSnap.data().master_pin);
         } else {
           console.error("No access_control document found in adminAccess!");
         }

@@ -4,6 +4,8 @@ import { Home, Box, PlusSquare, BarChart2, LogOut } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import logo from "../assets/petsolution.png";
+import toast, { Toaster } from "react-hot-toast";
+
 
 export default function Sidebar({ onUnlock }) {
   const navigate = useNavigate();
@@ -28,9 +30,9 @@ export default function Sidebar({ onUnlock }) {
     if (onUnlock(password)) {
       setShowPasswordModal(false);
       setPassword("");
-      navigate("/manageProduct"); // ✅ now route exists
+      navigate("/manageProduct"); 
     } else {
-      alert("Invalid password");
+      toast.error("Invalid password");
     }
   };
 
