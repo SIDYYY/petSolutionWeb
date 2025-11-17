@@ -46,122 +46,113 @@ export default function ManageProduct() {
     }
   };
 
-  return (
-    <div className="h-full flex flex-col justify-center items-center">
+ return (
+    <div className="min-h-screen flex flex-col items-center pt-10 pb-20 bg-gray-50">
       {/* Toast container */}
       <Toaster position="top-center" reverseOrder={false} />
 
       {/* Header */}
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-extrabold text-orange-600 mb-3">
-          Manage Products
-        </h1>
+      <div className="text-center mb-20">
+        <h1 className="text-4xl font-extrabold text-orange-600 mb-2">Manage Products</h1>
         <p className="text-gray-600 text-lg">
           Add, update, or monitor your product inventory with ease.
         </p>
       </div>
 
-      {/* Card Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
-        {/* Add Product */}
+      {/* Custom grid layout */}
+      <div
+        className="grid grid-cols-5 grid-rows-2 gap-6 w-full max-w-7xl px-4"
+        style={{ gridTemplateRows: "auto auto" }}
+      >
+        {/* Left top: Add Product */}
         <Link
           to="/manage/addProduct"
-          className="bg-white border border-gray-200 p-8 rounded-2xl shadow-sm hover:shadow-lg hover:border-orange-400 transition group"
+          className="group bg-white border border-gray-200 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-orange-400 transition"
+          style={{ gridColumn: "1 / 2", gridRow: "1 / 2" }}
         >
-          <div className="flex flex-col items-center space-y-3">
-            <PlusCircle
-              className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
-              size={40}
-            />
-            <span className="text-lg font-semibold text-gray-800 group-hover:text-orange-600">
-              Add Product
-            </span>
-            <p className="text-sm text-gray-500 text-center">
-              Create a new product entry with full details.
-            </p>
-          </div>
+          <PlusCircle
+            className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
+            size={40}
+          />
+          <span className="text-lg font-semibold text-gray-800 mt-3">Add Product</span>
+          <p className="text-sm text-gray-500 text-center mt-1">
+            Create a new product entry with full details.
+          </p>
         </Link>
 
-        {/* Update Product */}
+        {/* Left bottom: Update Product */}
         <Link
           to="/manage/updateProduct"
-          className="bg-white border border-gray-200 p-8 rounded-2xl shadow-sm hover:shadow-lg hover:border-orange-400 transition group"
+          className="group bg-white border border-gray-200 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-orange-400 transition"
+          style={{ gridColumn: "1 / 2", gridRow: "2 / 3" }}
         >
-          <div className="flex flex-col items-center space-y-3">
-            <Edit
-              className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
-              size={40}
-            />
-            <span className="text-lg font-semibold text-gray-800 group-hover:text-orange-600">
-              Update Product
-            </span>
-            <p className="text-sm text-gray-500 text-center">
-              Edit existing product details or adjust inventory counts.
-            </p>
-          </div>
+          <Edit
+            className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
+            size={40}
+          />
+          <span className="text-lg font-semibold text-gray-800 mt-3">Update Product</span>
+          <p className="text-sm text-gray-500 text-center mt-1">
+            Edit existing product details or adjust inventory counts.
+          </p>
         </Link>
 
-        {/* Bulk Update */}
-        <Link
-          to="/manage/bulkUpdate"
-          className="bg-white border border-gray-200 p-8 rounded-2xl shadow-sm hover:shadow-lg hover:border-orange-400 transition group"
+        {/* Center big card: Run Inventory Analysis */}
+        <div
+          className="group bg-white border border-gray-200 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-orange-400 transition"
+          style={{ gridColumn: "2 / 5", gridRow: "1 / 3" }}
         >
-          <div className="flex flex-col items-center space-y-3">
-            <Layers
-              className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
-              size={40}
-            />
-            <span className="text-lg font-semibold text-gray-800 group-hover:text-orange-600">
-              Bulk Update
-            </span>
-            <p className="text-sm text-gray-500 text-center">
-              Upload a spreadsheet to modify multiple products quickly.
-            </p>
-          </div>
-        </Link>
-
-        {/* 🔐 Admin Password Management */}
-        <Link
-          to="/adminPass"
-          className="bg-white border border-gray-200 p-8 rounded-2xl shadow-sm hover:shadow-lg hover:border-orange-400 transition group"
-        >
-          <div className="flex flex-col items-center space-y-3">
-            <KeyRound
-              className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
-              size={40}
-            />
-            <span className="text-lg font-semibold text-gray-800 group-hover:text-orange-600">
-              Change Admin Password
-            </span>
-            <p className="text-sm text-gray-500 text-center">
-              Update the admin access password securely from here.
-            </p>
-          </div>
-        </Link>
-      </div>
-
-      {/* Inventory Analysis Section */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-10 text-center max-w-md">
-        <div className="flex flex-col items-center space-y-4">
-          <BarChart3 size={45} className="text-orange-500" />
-          <h2 className="text-2xl font-bold text-gray-800">
-            Run Daily Inventory Analysis
-          </h2>
-          <p className="text-gray-500 text-sm max-w-sm">
-            Perform a comprehensive analysis using AI-driven stock monitoring to
-            detect deadstock and recommend replenishment levels.
+          <BarChart3 size={45} className="text-orange-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Run Daily Inventory Analysis</h2>
+          <p className="text-gray-500 text-sm max-w-md mx-auto mb-6">
+            Perform a comprehensive analysis using AI-driven stock monitoring to detect deadstock
+            and recommend replenishment levels.
           </p>
 
           <button
             disabled={loading}
             onClick={handleRunInventory}
-            className={`mt-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-all ${
+            className={`bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-all ${
               loading ? "opacity-60 cursor-not-allowed" : ""
             }`}
           >
             {loading ? "Analyzing..." : "Run Analysis Now"}
           </button>
         </div>
+
+        {/* Right top: Bulk Update */}
+        <Link
+          to="/manage/bulkUpdate"
+          className="group bg-white border border-gray-200 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-orange-400 transition"
+          style={{ gridColumn: "5 / 6", gridRow: "1 / 2" }}
+        >
+          <Layers
+            className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
+            size={40}
+          />
+          <span className="text-lg font-semibold text-gray-800 mt-3">Bulk Update</span>
+          <p className="text-sm text-gray-500 text-center mt-1">
+            Upload a spreadsheet to modify multiple products quickly.
+          </p>
+        </Link>
+
+        {/* Right bottom: Change Admin Password */}
+       <Link
+          to="/adminPass"
+          className="group bg-white border border-gray-200 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-orange-400 transition"
+          style={{ gridColumn: "5 / 6", gridRow: "2 / 3" }}
+        >
+          <KeyRound
+            className="text-orange-500 group-hover:scale-125 transition-transform duration-300"
+            size={40}
+          />
+          <span className="text-lg font-semibold text-gray-800">
+            Change Admin Password
+          </span>
+          <p className="text-sm text-gray-500">
+            Update the admin access password securely from here.
+          </p>
+        </Link>
+
       </div>
     </div>
   );

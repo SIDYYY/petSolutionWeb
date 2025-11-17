@@ -23,18 +23,17 @@ import {
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
-  // Inventory / UI states (kept from your original file)
+  // Inventory / UI states
   const [stats, setStats] = useState({
     count: 0,
     totalQty: 0,
     lowStockCount: 0,
     deadStockCount: 0,
   });
-  const [staff, setStaff] = useState("");
   const [deadstockItems, setDeadstockItems] = useState([]);
   const [reorderItems, setReorderItems] = useState([]);
 
-  // Sales summary (net sales excluding refunded qty)
+  // Sales summary
   const [salesSummary, setSalesSummary] = useState({
     today: 0,
     month: 0,
@@ -44,32 +43,26 @@ export default function Dashboard() {
     yearRefunds: 0,
   });
 
-  // raw sales fetched for detailed reports
-  const [salesRaw, setSalesRaw] = useState([]); // each: { id, createdAt:Date, items:[], status, rawTotal, paymentMode, discountPercent }
-
-  // PIN + report modal states
+  const [salesRaw, setSalesRaw] = useState([]);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [enteredPin, setEnteredPin] = useState("");
   const [pinError, setPinError] = useState("");
   const [masterPin, setMasterPin] = useState(null);
 
   const [reportModalOpen, setReportModalOpen] = useState(false);
-  const [reportPeriod, setReportPeriod] = useState("daily"); // "daily" | "monthly" | "yearly"
+  const [reportPeriod, setReportPeriod] = useState("daily");
   const [reportDetails, setReportDetails] = useState({
     rows: [],
     totals: { totalSales: 0, totalRefunds: 0, netSales: 0 },
     periodLabel: "",
   });
 
-  // ---------- formatting helper ----------
   const formatCurrency = (amount = 0) =>
     Number(amount).toLocaleString("en-PH", { style: "currency", currency: "PHP" });
 
-  // ---------- initial fetch: products, sales, master pin ----------
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        // PRODUCTS: inventory stats, deadstock, reorder
         const snap = await getDocs(collection(db, "products"));
         let totalQty = 0,
           lowStock = 0,
@@ -99,7 +92,6 @@ export default function Dashboard() {
         setDeadstockItems(deadArr.slice(0, 5));
         setReorderItems(reorderArr.slice(0, 5));
 
-        // SALES: fetch ordered by createdAt desc
         const salesQ = query(collection(db, "sales_history"), orderBy("createdAt", "desc"));
         const salesSnap = await getDocs(salesQ);
         const raw = [];
@@ -118,20 +110,15 @@ export default function Dashboard() {
         });
         setSalesRaw(raw);
 
-        // Master PIN from adminAccess/access_control.master_pin
         try {
           const pinSnap = await getDoc(doc(db, "adminAccess", "access_control"));
-          if (pinSnap.exists()) {
-            setMasterPin(pinSnap.data().master_pin || null);
-          } else {
-            setMasterPin(null);
-          }
+          if (pinSnap.exists()) setMasterPin(pinSnap.data().master_pin || null);
+          else setMasterPin(null);
         } catch (pinErr) {
           console.error("Error fetching master PIN:", pinErr);
           setMasterPin(null);
         }
 
-        // compute summary numbers
         computeSummaryFromRaw(raw);
       } catch (err) {
         console.error("Dashboard initial fetch error:", err);
@@ -143,7 +130,6 @@ export default function Dashboard() {
     fetchAll();
   }, []);
 
-  // ---------- compute sales summary (net sales, refunds) ----------
   const computeSummaryFromRaw = (rawSales) => {
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
@@ -202,7 +188,6 @@ export default function Dashboard() {
     });
   };
 
-  // ---------- PIN flow ----------
   const openReportPin = (period) => {
     setReportPeriod(period);
     setEnteredPin("");
@@ -212,25 +197,15 @@ export default function Dashboard() {
 
   const verifyPinAndOpenReport = () => {
     setPinError("");
-    if (!masterPin) {
-      setPinError("Master PIN not configured.");
-      return;
-    }
-    if (!enteredPin) {
-      setPinError("Please enter PIN.");
-      return;
-    }
-    if (String(enteredPin) !== String(masterPin)) {
-      setPinError("Incorrect PIN.");
-      return;
-    }
-    // success
+    if (!masterPin) return setPinError("Master PIN not configured.");
+    if (!enteredPin) return setPinError("Please enter PIN.");
+    if (String(enteredPin) !== String(masterPin)) return setPinError("Incorrect PIN.");
+
     setPinModalOpen(false);
     generateReportDetails(reportPeriod);
     setReportModalOpen(true);
   };
 
-  // ---------- generate report details for period ----------
   const generateReportDetails = (period) => {
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
@@ -240,20 +215,13 @@ export default function Dashboard() {
     const filtered = salesRaw.filter((sale) => {
       const c = sale.createdAt;
       if (!c) return false;
-      if (period === "daily") {
-        return c.toISOString().slice(0, 10) === todayStr;
-      }
-      if (period === "monthly") {
-        return c.getMonth() === curMonth && c.getFullYear() === curYear;
-      }
-      if (period === "yearly") {
-        return c.getFullYear() === curYear;
-      }
+      if (period === "daily") return c.toISOString().slice(0, 10) === todayStr;
+      if (period === "monthly") return c.getMonth() === curMonth && c.getFullYear() === curYear;
+      if (period === "yearly") return c.getFullYear() === curYear;
       return false;
     });
 
-    // aggregate by productId (fallback use name)
-    const agg = {}; // pid -> { productId, name, price, totalQty, totalRefundedQty, subtotal, refundedAmount }
+    const agg = {};
     let totalSales = 0,
       totalRefunds = 0,
       netSales = 0;
@@ -266,17 +234,7 @@ export default function Dashboard() {
         const qty = Number(it.qty || 0);
         const refundedQty = Number(it.refundedQty || 0);
 
-        if (!agg[pid]) {
-          agg[pid] = {
-            productId: pid,
-            name,
-            price,
-            totalQty: 0,
-            totalRefundedQty: 0,
-            subtotal: 0,
-            refundedAmount: 0,
-          };
-        }
+        if (!agg[pid]) agg[pid] = { productId: pid, name, price, totalQty: 0, totalRefundedQty: 0, subtotal: 0, refundedAmount: 0 };
 
         agg[pid].totalQty += qty;
         agg[pid].totalRefundedQty += refundedQty;
@@ -288,7 +246,7 @@ export default function Dashboard() {
     const rows = Object.values(agg).map((a) => {
       const netQty = Math.max(0, a.totalQty - a.totalRefundedQty);
       const netSubtotal = Math.max(0, a.subtotal - a.refundedAmount);
-      totalSales += a.subtotal; // before refunds
+      totalSales += a.subtotal;
       totalRefunds += a.refundedAmount;
       netSales += netSubtotal;
       return {
@@ -306,56 +264,33 @@ export default function Dashboard() {
 
     rows.sort((a, b) => b.netQty - a.netQty || a.name.localeCompare(b.name));
 
-    let label = "";
-    if (period === "daily") label = `Daily (${now.toLocaleDateString()})`;
-    if (period === "monthly") label = `Monthly (${now.toLocaleString("default", { month: "long", year: "numeric" })})`;
-    if (period === "yearly") label = `Yearly (${now.getFullYear()})`;
+    let label = period === "daily" ? `Daily (${now.toLocaleDateString()})`
+      : period === "monthly" ? `Monthly (${now.toLocaleString("default", { month: "long", year: "numeric" })})`
+      : `Yearly (${now.getFullYear()})`;
 
-    setReportDetails({
-      rows,
-      totals: { totalSales, totalRefunds, netSales },
-      periodLabel: label,
-    });
+    setReportDetails({ rows, totals: { totalSales, totalRefunds, netSales }, periodLabel: label });
   };
 
-  // ---------- CSV export ----------
   const csvEscape = (v) => {
     if (v === undefined || v === null) return "";
     const s = String(v);
-    if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-      return `"${s.replace(/"/g, '""')}"`;
-    }
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
 
   const downloadReportCSV = () => {
     const { rows, totals, periodLabel } = reportDetails;
     const headerCols = [
-      "Product ID",
-      "Name",
-      "Unit Price",
-      "Total Qty (sold)",
-      "Refunded Qty",
-      "Net Qty",
-      "Subtotal (before refunds)",
-      "Refunded Amount",
-      "Net Subtotal",
+      "Product ID", "Name", "Unit Price", "Total Qty (sold)", "Refunded Qty",
+      "Net Qty", "Subtotal (before refunds)", "Refunded Amount", "Net Subtotal"
     ];
     let csv = `${periodLabel}\n${headerCols.join(",")}\n`;
     rows.forEach((r) => {
       csv += [
-        csvEscape(r.productId),
-        csvEscape(r.name),
-        r.price,
-        r.totalQty,
-        r.totalRefundedQty,
-        r.netQty,
-        r.subtotal,
-        r.refundedAmount,
-        r.netSubtotal,
+        csvEscape(r.productId), csvEscape(r.name), r.price, r.totalQty,
+        r.totalRefundedQty, r.netQty, r.subtotal, r.refundedAmount, r.netSubtotal
       ].join(",") + "\n";
     });
-
     csv += `\nTotals,,,,, ,${totals.totalSales},${totals.totalRefunds},${totals.netSales}\n`;
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -369,70 +304,75 @@ export default function Dashboard() {
 
   if (loading) return <Loading text="Loading Dashboard..." />;
 
-  // ---------- UI ----------
   return (
-    <div className=" px-4 sm:px-6 lg:px-8">
+    <div className="px-4 sm:px-6 lg:px-8 mb-10 space-y-6">
       {/* SALES SUMMARY */}
-      <div className="bg-white shadow rounded-md p-6 text-left">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Sales Summary</h2>
+      <div className="bg-gray-50 p-6 rounded-2xl shadow-lg">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Sales Summary</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <SummaryCard
+          icon={<TrendingUp size={22} />}
+          title="Today"
+          value={formatCurrency(salesSummary.today)}
+          refunds={formatCurrency(salesSummary.todayRefunds)}
+          onView={() => openReportPin("daily")}
+          gradientFrom="from-orange-500"
+          gradientTo="to-orange-400"
+        />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <SummaryCard
-            icon={<TrendingUp size={22} />}
-            title="Today"
-            value={formatCurrency(salesSummary.today)}
-            refunds={formatCurrency(salesSummary.todayRefunds)}
-            onView={() => openReportPin("daily")}
-          />
-          <SummaryCard
-            icon={<CalendarDays size={22} />}
-            title="This Month"
-            value={formatCurrency(salesSummary.month)}
-            refunds={formatCurrency(salesSummary.monthRefunds)}
-            onView={() => openReportPin("monthly")}
-          />
-          <SummaryCard
-            icon={<Calendar size={22} />}
-            title="This Year"
-            value={formatCurrency(salesSummary.year)}
-            refunds={formatCurrency(salesSummary.yearRefunds)}
-            onView={() => openReportPin("yearly")}
-          />
+        <SummaryCard
+          icon={<CalendarDays size={22} />}
+          title="This Month"
+          value={formatCurrency(salesSummary.month)}
+          refunds={formatCurrency(salesSummary.monthRefunds)}
+          onView={() => openReportPin("monthly")}
+          gradientFrom="from-orange-500"
+          gradientTo="to-orange-400"
+        />
+
+        <SummaryCard
+          icon={<Calendar size={22} />}
+          title="This Year"
+          value={formatCurrency(salesSummary.year)}
+          refunds={formatCurrency(salesSummary.yearRefunds)}
+          onView={() => openReportPin("yearly")}
+          gradientFrom="from-orange-500"
+          gradientTo="to-orange-400"
+        />
+
         </div>
-
         <div className="text-right mt-4">
-          <Link to="/cashier?view=sales" className="text-orange-500 text-sm font-medium hover:underline">View Sales History →</Link>
+          <Link to="/SalesHistory" className="text-orange-500 font-semibold hover:underline">View Sales History →</Link>
         </div>
       </div>
 
       {/* INVENTORY OVERVIEW */}
-      <div className="bg-white shadow rounded-md p-6 text-left">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">Inventory Overview</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <OverviewCard icon={Box} label="Total Products" value={stats.count} />
-          <OverviewCard icon={AlertTriangle} label="Low Stock" value={stats.lowStockCount} color="#f97316" />
-          <OverviewCard icon={Archive} label="Deadstock" value={stats.deadStockCount} color="#f97316" />
+      <div className="bg-gray-50 p-6 rounded-2xl shadow-lg">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Inventory Overview</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 ">
+        <OverviewCard icon={Box} label="Total Products" value={stats.count} gradientFrom="from-orange-400" gradientTo="to-orange-400" />
+        <OverviewCard icon={AlertTriangle} label="Low Stock" value={stats.lowStockCount} gradientFrom="from-orange-400" gradientTo="to-orange-400" />
+        <OverviewCard icon={Archive} label="Deadstock" value={stats.deadStockCount} gradientFrom="from-orange-400" gradientTo="to-orange-400" />
+
         </div>
 
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Reorder Items */}
           {reorderItems.length > 0 && (
             <InfoCard title={`🛒 Reorder Recommendations (${reorderItems.length})`}>
               <ul className="divide-y divide-gray-200">
                 {reorderItems.map(item => (
-                  <li key={item.id} className="flex justify-between py-2 text-left">
+                  <li key={item.id} className="flex justify-between py-2">
                     <span className="font-medium text-gray-800">{item.name}</span>
                     <span className="text-gray-600 text-sm">Qty: {item.qty} / Threshold: {item.threshold}</span>
                   </li>
                 ))}
               </ul>
               <div className="text-right mt-2">
-                <Link to="/products" className="text-orange-500 text-sm font-medium hover:underline">View All →</Link>
+                <Link to="/products" className="text-orange-500 font-medium hover:underline">View All →</Link>
               </div>
             </InfoCard>
           )}
 
-          {/* Deadstock Items */}
           {deadstockItems.length > 0 && (
             <InfoCard title={`🗄 Recently Detected Deadstock (${deadstockItems.length})`}>
               <ul className="divide-y divide-gray-200">
@@ -444,58 +384,56 @@ export default function Dashboard() {
                 ))}
               </ul>
               <div className="text-right mt-2">
-                <Link to="/products" className="text-orange-500 text-sm font-medium hover:underline">View All Deadstock →</Link>
+                <Link to="/products?filter=deadStock" className="text-orange-500 font-medium hover:underline">View All Deadstock →</Link>
               </div>
             </InfoCard>
           )}
         </div>
       </div>
 
-      {/* ---------- PIN MODAL ---------- */}
+      {/* PIN MODAL */}
       {pinModalOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-[90%] sm:w-[420px] p-6">
-            <h3 className="text-lg font-semibold mb-2">Enter Master PIN</h3>
+          <div className="bg-white rounded-2xl shadow-lg w-[90%] sm:w-[420px] p-6">
+            <h3 className="text-lg font-bold mb-2">Enter Master PIN</h3>
             <p className="text-sm text-gray-600 mb-4">This report is restricted. Enter the master PIN to proceed.</p>
-
             <input
               type="password"
               value={enteredPin}
               onChange={(e) => setEnteredPin(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-3"
+              className="w-full border rounded-lg px-3 py-2 mb-3"
               placeholder="Master PIN"
             />
             {pinError && <p className="text-sm text-red-600 mb-3">{pinError}</p>}
-
             <div className="flex justify-end gap-3">
-              <button onClick={() => setPinModalOpen(false)} className="px-4 py-2 rounded bg-gray-100">Cancel</button>
-              <button onClick={verifyPinAndOpenReport} className="px-4 py-2 rounded bg-orange-500 text-white">Verify</button>
+              <button onClick={() => setPinModalOpen(false)} className="px-4 py-2 rounded-lg bg-gray-100">Cancel</button>
+              <button onClick={verifyPinAndOpenReport} className="px-4 py-2 rounded-lg bg-orange-500 text-white">Verify</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ---------- REPORT MODAL (after PIN verified) ---------- */}
+      {/* REPORT MODAL */}
       {reportModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-auto py-10">
-          <div className="bg-white rounded-lg shadow-lg w-[95%] md:w-[1000px] p-5">
-            <div className="flex justify-between items-start gap-4">
+          <div className="bg-white rounded-2xl shadow-lg w-[95%] md:w-[1000px] p-6">
+            <div className="flex justify-between items-start gap-4 mb-4">
               <div>
-                <h3 className="text-lg font-semibold">{reportDetails.periodLabel}</h3>
+                <h3 className="text-lg font-bold">{reportDetails.periodLabel}</h3>
                 <p className="text-sm text-gray-600">Breakdown by product. Refunded quantities are shown but excluded from Net Sales.</p>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={downloadReportCSV} className="flex items-center gap-2 bg-orange-500 text-white px-3 py-2 rounded">
+                <button onClick={downloadReportCSV} className="flex items-center gap-2 bg-orange-500 text-white px-3 py-2 rounded-lg">
                   <Download size={16} /> Download CSV
                 </button>
-                <button onClick={() => setReportModalOpen(false)} className="px-3 py-2 rounded bg-gray-100">Close</button>
+                <button onClick={() => setReportModalOpen(false)} className="px-3 py-2 rounded-lg bg-gray-100">Close</button>
               </div>
             </div>
 
-            <div className="mt-4 overflow-auto max-h-[60vh]">
+            <div className="overflow-auto max-h-[60vh] mb-4">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="text-left border-b">
+                  <tr className="text-left border-b bg-gray-100">
                     <th className="py-2 px-2">Product</th>
                     <th className="py-2 px-2">Unit Price</th>
                     <th className="py-2 px-2">Total Qty</th>
@@ -510,7 +448,7 @@ export default function Dashboard() {
                   {reportDetails.rows.length === 0 ? (
                     <tr><td colSpan={8} className="py-4 text-center text-gray-500">No sales for this period.</td></tr>
                   ) : reportDetails.rows.map((r) => (
-                    <tr key={r.productId} className="border-b">
+                    <tr key={r.productId} className="border-b hover:bg-gray-50 transition">
                       <td className="py-2 px-2">{r.name}</td>
                       <td className="py-2 px-2">{formatCurrency(r.price)}</td>
                       <td className="py-2 px-2">{r.totalQty}</td>
@@ -525,7 +463,7 @@ export default function Dashboard() {
               </table>
             </div>
 
-            <div className="mt-4 flex justify-end gap-6">
+            <div className="flex justify-end gap-6">
               <div className="text-right">
                 <p className="text-sm text-gray-600">Total Sales (before refunds):</p>
                 <p className="font-semibold">{formatCurrency(reportDetails.totals?.totalSales || 0)}</p>
@@ -546,44 +484,52 @@ export default function Dashboard() {
   );
 }
 
-/* ---------- Small components ---------- */
+/* ---------- Redesigned small components ---------- */
+function OverviewCard({ icon: Icon, label, value, color, gradientFrom, gradientTo }) {
+  const bgClass = gradientFrom && gradientTo
+    ? `bg-gradient-to-r ${gradientFrom} ${gradientTo} text-white`
+    : color || "bg-gray-50";
 
-function OverviewCard({ icon: Icon, label, value }) {
+  const textColorClass = gradientFrom && gradientTo ? "text-white" : "text-gray-800";
+
   return (
-    <div className="bg-gray-50 p-4 rounded-md flex items-center gap-4 shadow-sm">
-      <Icon size={24} className="text-orange-500" />
+    <div className={`flex items-center gap-4 p-5 rounded-2xl hover:scale-105 transition-transform cursor-pointer ${bgClass}`}>
+      <Icon size={28} className={gradientFrom && gradientTo ? "text-white" : "text-orange-500"} />
       <div>
-        <p className="text-gray-500 text-sm">{label}</p>
-        <p className="text-lg font-bold text-gray-800">{value}</p>
+        <p className={`text-sm ${gradientFrom && gradientTo ? "text-white/90" : "text-gray-500"}`}>{label}</p>
+        <p className={`text-lg font-bold ${textColorClass}`}>{value}</p>
       </div>
     </div>
   );
 }
 
+
 function InfoCard({ title, children }) {
   return (
-    <div className="bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm">
-      <h3 className="text-md font-semibold text-gray-700 mb-2">{title}</h3>
+    <div className="bg-white p-5 rounded-2xl shadow border border-orange-200 hover:shadow-lg transition">
+      <h3 className="font-semibold text-gray-700 mb-3">{title}</h3>
       {children}
     </div>
   );
 }
 
-function SummaryCard({ icon, title, value, refunds, onView }) {
+function SummaryCard({ icon, title, value, refunds, onView, gradientFrom, gradientTo }) {
   return (
-    <div className="bg-white p-4 rounded-md shadow-sm border">
+    <div
+      className={`bg-gradient-to-r ${gradientFrom} ${gradientTo} text-white p-5 rounded-2xl shadow-lg flex flex-col justify-between hover:scale-105 transition-transform cursor-pointer`}
+    >
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">
-          <div className="text-orange-500">{icon}</div>
+          <div>{icon}</div>
           <div>
-            <p className="text-sm text-gray-500">{title}</p>
-            <p className="text-lg font-bold">{value}</p>
-            <p className="text-xs text-gray-500 mt-1">Refunds: {refunds}</p>
+            <p className="text-sm opacity-90">{title}</p>
+            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-xs mt-1 opacity-80">Refunds: {refunds}</p>
           </div>
         </div>
-        <div>
-          <button onClick={onView} className="text-orange-500 text-sm font-medium hover:underline">View</button>
-        </div>
+        <button onClick={onView} className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-sm font-semibold">
+          View
+        </button>
       </div>
     </div>
   );

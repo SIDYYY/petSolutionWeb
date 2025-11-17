@@ -1,25 +1,20 @@
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Box, PlusSquare, BarChart2, LogOut } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "../../firebase";
+import { Home, Box, PlusSquare, BarChart2, Lock } from "lucide-react";
 import logo from "../assets/petsolution.png";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 
-
-export default function Sidebar({ onUnlock }) {
-  const navigate = useNavigate();
+export default function Sidebar({ onUnlock, onLock }) {
+  const [isOpen, setIsOpen] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
-  // const handleLogout = async () => {
-  //   try {
-  //     await signOut(auth);
-  //     navigate("/login", { replace: true });
-  //   } catch (err) {
-  //     console.error("Logout failed", err);
-  //   }
-  // };
+  const navItems = [
+    { name: "Dashboard", icon: <Home size={30} />, path: "/dashboard" },
+    { name: "Cashier", icon: <BarChart2 size={30} />, path: "/cashier" },
+    { name: "Products", icon: <Box size={30} />, path: "/products" },
+  ];
 
   const handleManageClick = (e) => {
     e.preventDefault();
@@ -30,7 +25,7 @@ export default function Sidebar({ onUnlock }) {
     if (onUnlock(password)) {
       setShowPasswordModal(false);
       setPassword("");
-      navigate("/manageProduct"); 
+      navigate("/manageProduct");
     } else {
       toast.error("Invalid password");
     }
@@ -38,78 +33,94 @@ export default function Sidebar({ onUnlock }) {
 
   return (
     <>
-      <aside className="w-64 bg-[#FF9500] shadow-md">
-        <div className="p-4 text-2xl font-bold border-b flex flex-row gap-3 items-center ">
-          <img  src={logo} alt="Logo" className="w-16 h-14"/>
-          <h3 className="text-2xl font-semibold text-white">Pet Solution</h3>
-        </div>
-        <nav className="p-4 space-y-2">
-        <NavLink
-          to="/dashboard"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-white text-[#FF9500] font-semibold"
-                : "text-white hover:bg-white/20"
-            }`
-          }
-        >
-          <Home size={20} /> <span>Dashboard</span>
-        </NavLink>
-
-        <NavLink
-          to="/cashier"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-white text-[#FF9500] font-semibold"
-                : "text-white hover:bg-white/20"
-            }`
-          }
-        >
-          <BarChart2 size={20} /> <span>Cashier</span>
-        </NavLink>
-
-        <NavLink
-          to="/products"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-white text-[#FF9500] font-semibold"
-                : "text-white hover:bg-white/20"
-            }`
-          }
-        >
-          <Box size={20} /> <span>Products</span>
-        </NavLink>
-
-          {/* Manage Products (protected by password modal) */}
-        <a
-          href="/manageProduct"
-          onClick={handleManageClick}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-            window.location.pathname === "/manageProduct"
-              ? "bg-white text-[#FF9500] font-semibold"
-              : "text-white hover:bg-white/20"
+      <div
+        className={`bg-[#FF9500] h-screen relative transition-all duration-300 ${
+          isOpen ? "w-64" : "w-20"
+        } flex flex-col`}
+      >
+        {/* Logo */}
+        <div
+          className={`p-4 flex items-center border-b border-orange-600 transition-all duration-300 ${
+            isOpen ? "justify-start" : "justify-center"
           }`}
         >
-          <PlusSquare size={20} /> <span>Manage Products</span>
-        </a>
+          <img
+            src={logo}
+            alt="Logo"
+            className={`transition-all duration-300 ${
+              isOpen ? "w-20 h-16" : "w-14 h-12"
+            }`}
+          />
+          {isOpen && (
+            <span className="text-white font-semibold text-xl ml-3">
+              Pet Solution
+            </span>
+          )}
+        </div>
 
-          {/* <NavLink to="/reports" className="flex items-center gap-3 px-3 py-2 text-white">
-            <BarChart2 size={20} /> <span>Reports</span>
-          </NavLink> */}
+        {/* Normal nav items */}
+        <nav className="flex-1 flex flex-col p-2 space-y-2">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                  isActive
+                    ? "bg-white text-[#FF9500] font-semibold"
+                    : "text-white hover:bg-white/20"
+                }`
+              }
+            >
+              {item.icon}
+              {isOpen && <span>{item.name}</span>}
+            </NavLink>
+          ))}
+
+          {/* Manage Products WITH PIN */}
+          <div
+            onClick={handleManageClick}
+            className={`cursor-pointer flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              window.location.pathname === "/manageProduct"
+                ? "bg-white text-[#FF9500] font-semibold"
+                : "text-white hover:bg-white/20"
+            }`}
+          >
+            <PlusSquare size={30} />
+            {isOpen && <span>Manage Products</span>}
+          </div>
         </nav>
 
-        {/* Logout button */}
-        {/* <button
-          onClick={handleLogout}
-          className="m-4 flex items-center gap-3 px-3 py-2 rounded-lg font-medium text-white hover:bg-white/10 transition-colors"
-        >
-          <LogOut size={20} />
-          <span>Logout</span>
-        </button> */}
-      </aside>
+        <div className="mt-auto p-3">
+          <button
+            onClick={() => {
+              onLock();         
+              navigate("/");
+              toast("🔒 App Locked!");
+            }}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:bg-white/20 w-full justify-center"
+          >
+            <Lock size={24} />
+            {isOpen && <span>Locked</span>}
+          </button>
+        </div>
+
+        {/* Toggle Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`
+          absolute right-0 top-1/2 -translate-y-1/2 
+          bg-white/20 hover:bg-white/50 backdrop-blur-sm 
+          text-white w-8 h-12 flex items-center justify-center 
+          rounded-l-lg shadow-md 
+          transition-all duration-300 ease-in-out
+          hover:scale-105
+        `}
+      >
+        <span className="text-lg font-bold">{isOpen ? "❮" : "❯"}</span>
+      </button>
+
+      </div>
 
       {/* Password Modal */}
       {showPasswordModal && (

@@ -18,6 +18,7 @@ import Settings from "./pages/settings";
 import Cashier from "./pages/cashier";
 import IntroLock from "./pages/IntroLock";
 import AdminPass from "./pages/adminPass";
+import SalesHistory from "./pages/SalesHistory"; 
 
 function PrivateLayout({ isInventoryUnlocked, onUnlock, onLock }) {
   return (
@@ -58,17 +59,18 @@ export default function App() {
   }, []);
 
   // Unlock with password from Firestore
-  const handleUnlock = (password) => {
+const handleUnlock = (password) => {
     if (password === storedPassword) {
       setIsInventoryUnlocked(true);
+      setIsAccessGranted(true); // user can now see PrivateLayout
       return true;
     }
     return false;
   };
 
-  // Manual lock (Finish button or leaving)
   const handleLock = () => {
     setIsInventoryUnlocked(false);
+    setIsAccessGranted(false); // this will hide the PrivateLayout
   };
 
   // Show IntroLock until access is granted
@@ -96,6 +98,8 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="cashier" element={<Cashier />} />
         <Route path="adminPass" element={<AdminPass />} />
+        <Route path="SalesHistory" element={<SalesHistory />} />
+        
 
         {/* CRUD routes only available if unlocked */}
         {isInventoryUnlocked && (

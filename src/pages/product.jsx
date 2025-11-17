@@ -3,12 +3,21 @@ import { collection, getDocs } from 'firebase/firestore';
 import { Search } from 'lucide-react';
 import { db } from '../../firebase';
 import Loading from './functions/loading';
+import { useLocation } from 'react-router-dom';
+
 
 export default function Products() {
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [option, setOption] = useState('');
+
+  useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const filterParam = params.get('filter');
+  if (filterParam) setOption(filterParam); 
+}, [location]);
 
   useEffect(() => {
     const fetchProducts = async () => {
