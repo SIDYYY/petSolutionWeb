@@ -17,8 +17,9 @@ import Reports from "./pages/reports";
 import Settings from "./pages/settings";
 import Cashier from "./pages/cashier";
 import IntroLock from "./pages/IntroLock";
-import AdminPass from "./pages/adminPass";
+import AdminPass from "./pages/manage/adminPass";
 import SalesHistory from "./pages/SalesHistory"; 
+import SalesReport from "./pages/salesReport";
 
 function PrivateLayout({ isInventoryUnlocked, onUnlock, onLock }) {
   return (
@@ -97,8 +98,8 @@ const handleUnlock = (password) => {
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
         <Route path="cashier" element={<Cashier />} />
-        <Route path="adminPass" element={<AdminPass />} />
         <Route path="SalesHistory" element={<SalesHistory />} />
+        <Route path="salesReport" element={<SalesReport />} />
         
 
         {/* CRUD routes only available if unlocked */}
@@ -108,6 +109,7 @@ const handleUnlock = (password) => {
             <Route path="manage/bulkUpdate" element={<BulkUpdate />} />
             <Route path="manage/addProduct" element={<AddProduct />} />
             <Route path="manage/updateProduct" element={<UpdateProduct />} />
+            <Route path="manage/adminPass" element={<AdminPass />} />
           </>
         )}
       </Route>

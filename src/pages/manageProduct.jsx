@@ -137,7 +137,7 @@ export default function ManageProduct() {
 
         {/* Right bottom: Change Admin Password */}
        <Link
-          to="/adminPass"
+          to="/manage/adminPass"
           className="group bg-white border border-gray-200 p-6 rounded-2xl shadow-sm flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-orange-400 transition"
           style={{ gridColumn: "5 / 6", gridRow: "2 / 3" }}
         >

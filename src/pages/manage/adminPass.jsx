@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db } from "../../../firebase";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+
 
 export default function ChangeAccess() {
   const [mode, setMode] = useState("password"); // "password" or "masterPin"
@@ -65,7 +67,18 @@ export default function ChangeAccess() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 px-4">
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 px-4 relative">
+  {/* Back Button */}
+  <button
+    onClick={() => navigate(-1)}
+    className="flex items-center gap-2 px-4 py-2
+               bg-[#FF9500] hover:bg-[#e67f00]
+               text-white font-semibold rounded-xl
+               shadow-md transition-all duration-200 absolute top-4 left-4"
+  >
+    <ArrowLeft size={20} className="text-white" />
+    Back
+  </button>
       <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
         <h1 className="text-2xl font-bold text-center text-orange-600 mb-6">
           Change {mode === "password" ? "Password" : "Master PIN"}

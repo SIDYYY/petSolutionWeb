@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { ArrowLeft } from "lucide-react";
 import Papa from 'papaparse';
 import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { useNavigate } from "react-router-dom";
+
 
 export default function BulkUpdate() {
+  const navigate = useNavigate();
   const [dbProducts, setDbProducts] = useState(new Map());
   const [diff, setDiff] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -107,7 +111,18 @@ export default function BulkUpdate() {
 
   /* UI */
   return (
+    
     <div className="p-6 max-w-6xl mx-auto space-y-6 border rounded-sm">
+              <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 px-5 py-2 
+                    bg-orange-500 hover:bg-orange-600
+                    text-white font-semibold rounded-xl 
+                    shadow-md transition-all duration-200"
+        >
+  <ArrowLeft size={20} className="text-white" />
+          Back
+        </button>
       <h2 className="text-2xl font-bold text-orange-500">Bulk Product Update</h2>
 
       <div className="flex justify-between">

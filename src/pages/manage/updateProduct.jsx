@@ -8,9 +8,12 @@ import {
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useForm } from "react-hook-form";
-import { Pencil, Trash2, Search, AlertTriangle, X } from "lucide-react";
+import { Pencil, Trash2, Search, AlertTriangle, X, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
 
 export default function ManageProducts() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
@@ -109,6 +112,18 @@ export default function ManageProducts() {
 
   return (
     <div className="flex flex-col md:flex-row w-full min-h-screen bg-gray-100 p-4 md:p-6 gap-6 relative">
+      {/* 🔙 Back Button */}
+    <button
+      onClick={() => navigate(-1)}
+      className="flex items-center gap-2 px-4 py-2 
+                bg-orange-500 hover:bg-orange-600
+                text-white font-semibold rounded-xl 
+                shadow-md transition-all duration-200 absolute top-4 left-4"
+    >
+      <ArrowLeft size={18} className="text-white" />
+      Back
+    </button>
+
       {/* ✅ Toast Notification */}
       {toast && (
         <div
@@ -165,8 +180,10 @@ export default function ManageProducts() {
       )}
 
       {/* LEFT SIDE: Update Form */}
+      
       <div className="md:w-1/3 w-full bg-white rounded-xl shadow-lg p-6">
-        <h1 className="text-2xl font-semibold text-gray-800 mb-4">
+      
+        <h1 className="text-2xl font-semibold text-gray-800 mt-9">
           {selectedProduct ? "Update Product" : "Select a Product to Edit"}
         </h1>
 
@@ -209,7 +226,9 @@ export default function ManageProducts() {
 
       {/* RIGHT SIDE: Product Table */}
       <div className="flex-1 bg-white rounded-xl shadow-lg p-6 overflow-auto">
+        
         <div className="flex justify-between items-center mb-4">
+          
           <h2 className="text-2xl font-semibold text-gray-800">Products</h2>
 
           {/* 🔍 Search bar */}

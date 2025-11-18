@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Box, PlusSquare, BarChart2, Lock } from "lucide-react";
+import { Home, Box, PlusSquare, CreditCard , Lock, PieChart, Settings   } from "lucide-react";
 import logo from "../assets/petsolution.png";
 import toast from "react-hot-toast";
 
@@ -12,8 +12,9 @@ export default function Sidebar({ onUnlock, onLock }) {
 
   const navItems = [
     { name: "Dashboard", icon: <Home size={30} />, path: "/dashboard" },
-    { name: "Cashier", icon: <BarChart2 size={30} />, path: "/cashier" },
+    { name: "Cashier", icon: <CreditCard  size={30} />, path: "/cashier" },
     { name: "Products", icon: <Box size={30} />, path: "/products" },
+    { name: "Sales Report", icon: <PieChart  size={30} />, path: "/salesReport" }
   ];
 
   const handleManageClick = (e) => {
@@ -86,7 +87,7 @@ export default function Sidebar({ onUnlock, onLock }) {
                 : "text-white hover:bg-white/20"
             }`}
           >
-            <PlusSquare size={30} />
+            <Settings  size={30} />
             {isOpen && <span>Manage Products</span>}
           </div>
         </nav>

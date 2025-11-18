@@ -8,6 +8,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
+import { useNavigate } from "react-router-dom";
 import {
   PackagePlus,
   Box,
@@ -16,6 +17,7 @@ import {
   Clock,
   AlertTriangle,
   X,
+  ArrowLeft
 } from "lucide-react";
 
 export default function ManageProduct() {
@@ -26,9 +28,10 @@ export default function ManageProduct() {
     formState: { errors },
   } = useForm();
 
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
-  const [toast, setToast] = useState(null); // 🔥 for success/error alert
-  const [confirmModal, setConfirmModal] = useState(null); // 🔥 for confirmation modal
+  const [toast, setToast] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
 
   // 🔥 Fetch recent products in real time
   useEffect(() => {
@@ -43,7 +46,7 @@ export default function ManageProduct() {
     return () => unsubscribe();
   }, []);
 
-  // 🧾 Add product (with modal confirmation + toast)
+  
   const onSubmit = (data) => {
     setConfirmModal({
       title: "Add Product",
@@ -77,6 +80,8 @@ export default function ManageProduct() {
   };
 
   return (
+
+
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden relative">
       {/* ✅ Toast Notification */}
       {toast && (
@@ -135,6 +140,16 @@ export default function ManageProduct() {
 
       {/* HEADER */}
       <header className="bg-white shadow-sm py-4 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 px-5 py-2 
+                    bg-orange-500 hover:bg-orange-600
+                    text-white font-semibold rounded-xl 
+                    shadow-md transition-all duration-200"
+        >
+          <ArrowLeft size={20} className="text-white" />
+          Back
+        </button>
         <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
           <PackagePlus className="text-orange-500" size={26} />
           Manage Products
