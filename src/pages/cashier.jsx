@@ -361,7 +361,7 @@ export default function Cashier() {
             onClick={() => navigate("/SalesHistory")}
             className="w-full flex flex-col items-center justify-center gap-2
                border border-orange-500 hover:bg-orange-600 text-gray-800
-               rounded-lg py-4 font-semibold shadow"
+               rounded-lg py-4 font-semibold shadow hover:text-white"
           >
             <span>Sales History</span>
           </button>

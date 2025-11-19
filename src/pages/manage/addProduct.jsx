@@ -251,7 +251,7 @@ export default function ManageProduct() {
           </h2>
           <button
           onClick={() => reset()}
-          className="p-2 mb-10 bg-orange-600 rounded-xl text-sm text-white hover:text-orange-500 transition"
+          className="p-2 mb-10 bg-orange-600 rounded-xl text-sm text-white hover:text-white transition"
         >
           Clear Form
         </button>
