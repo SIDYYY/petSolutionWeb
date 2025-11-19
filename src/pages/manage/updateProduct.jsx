@@ -45,41 +45,42 @@ export default function ManageProducts() {
     );
   }, [search, products]);
 
-  // Update product
-  const onSubmit = async (data) => {
-    if (!selectedProduct) return;
+// Update product
+const onSubmit = async (data) => {
+  if (!selectedProduct) return;
 
-    setConfirmModal({
-      title: "Update Product",
-      message: `Are you sure you want to update "${data.name}" to quantity ${data.qty}?`,
-      onConfirm: async () => {
-        try {
-          const productRef = doc(db, "products", selectedProduct.id);
-          await updateDoc(productRef, {
-            name: data.name,
-            qty: Number(data.qty),
-          });
-          setToast({
-            type: "success",
-            title: "Product Updated",
-            message: `${data.name} has been updated successfully!`,
-          });
-          reset();
-          setSelectedProduct(null);
-          fetchProducts();
-        } catch (err) {
-          console.error("Error updating product:", err);
-          setToast({
-            type: "error",
-            title: "Error",
-            message: "Failed to update product.",
-          });
-        }
-        setConfirmModal(null);
-      },
-      onCancel: () => setConfirmModal(null),
-    });
-  };
+  setConfirmModal({
+    title: "Update Product",
+    message: `Are you sure you want to update "${data.name}" to quantity ${data.qty} and price ${data.price}?`,
+    onConfirm: async () => {
+      try {
+        const productRef = doc(db, "products", selectedProduct.id);
+        await updateDoc(productRef, {
+          name: data.name,
+          qty: Number(data.qty),
+          price: Number(data.price), // <-- added price update
+        });
+        setToast({
+          type: "success",
+          title: "Product Updated",
+          message: `${data.name} has been updated successfully!`,
+        });
+        reset();
+        setSelectedProduct(null);
+        fetchProducts();
+      } catch (err) {
+        console.error("Error updating product:", err);
+        setToast({
+          type: "error",
+          title: "Error",
+          message: "Failed to update product.",
+        });
+      }
+      setConfirmModal(null);
+    },
+    onCancel: () => setConfirmModal(null),
+  });
+};
 
   // Delete product (with confirmation modal)
   const handleDelete = (id) => {
@@ -182,13 +183,13 @@ export default function ManageProducts() {
       {/* LEFT SIDE: Update Form */}
       
       <div className="md:w-1/3 w-full bg-white rounded-xl shadow-lg p-6">
-      
-        <h1 className="text-2xl font-semibold text-gray-800 mt-9">
+        <h1 className="text-2xl font-semibold text-gray-800 mb-6 mt-8">
           {selectedProduct ? "Update Product" : "Select a Product to Edit"}
         </h1>
 
         {selectedProduct ? (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Product Name */}
             <div>
               <label className="block font-medium text-gray-700 mb-1">
                 Product Name
@@ -200,6 +201,7 @@ export default function ManageProducts() {
               />
             </div>
 
+            {/* Quantity */}
             <div>
               <label className="block font-medium text-gray-700 mb-1">
                 Quantity
@@ -212,6 +214,21 @@ export default function ManageProducts() {
               />
             </div>
 
+            {/* Price */}
+            <div>
+              <label className="block font-medium text-gray-700 mb-1">
+                Price
+              </label>
+              <input
+                {...register("price", { required: true })}
+                type="number"
+                step="0.01"
+                defaultValue={selectedProduct.price || 0}
+                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-400 outline-none"
+              />
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
               className="w-full bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 transition"
@@ -223,6 +240,7 @@ export default function ManageProducts() {
           <p className="text-gray-500">Select a product to begin editing.</p>
         )}
       </div>
+
 
       {/* RIGHT SIDE: Product Table */}
       <div className="flex-1 bg-white rounded-xl shadow-lg p-6 overflow-auto">
@@ -249,6 +267,7 @@ export default function ManageProducts() {
             <thead className="bg-orange-500 text-white">
               <tr>
                 <th className="py-3 px-4 text-left">Product Name</th>
+                <th className="py-3 px-4 text-left">Price</th>
                 <th className="py-3 px-4 text-left">Quantity</th>
                 <th className="py-3 px-4 text-center">Action</th>
               </tr>
@@ -261,6 +280,7 @@ export default function ManageProducts() {
                     className="border-t hover:bg-gray-50 transition"
                   >
                     <td className="py-3 px-4">{prod.name}</td>
+                    <td className="py-3 px-4">{prod.price}</td>
                     <td className="py-3 px-4">{prod.qty}</td>
                     <td className="py-3 px-4 flex justify-center gap-3">
                       <button

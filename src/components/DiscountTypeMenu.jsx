@@ -1,4 +1,3 @@
-// src/components/DiscountTypeMenu.jsx
 import React from "react";
 
 export default function DiscountTypeMenu({

@@ -102,7 +102,7 @@ export default function Sidebar({ onUnlock, onLock }) {
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:bg-white/20 w-full justify-center"
           >
             <Lock size={24} />
-            {isOpen && <span>Locked</span>}
+            {isOpen && <span>Lock</span>}
           </button>
         </div>
 

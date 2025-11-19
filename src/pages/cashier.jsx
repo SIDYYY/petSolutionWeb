@@ -368,27 +368,50 @@ export default function Cashier() {
 
 
           <button
-            onClick={() => {
-              if (cart.length === 0) {
-                setMessage("❌ Add products first"); // show toast
-                setTimeout(() => setMessage(null), 2000); // auto hide after 2s
-                return;
-              }
-              processPayment({
-                cart,
-                discount,
-                paymentMethod,
-                setCart,
-                setDiscount,
-                setDiscountValue,
-                setPaymentMethod,
-                setMessage,
-              });
-            }}
-            className="mt-auto bg-orange-500 hover:bg-yellow-600 text-white rounded-sm py-4 text-lg font-bold flex items-center justify-center"
-          >
-            <div className="text-sm mr-3">Payment</div>
-          </button>
+          onClick={() => {
+            // Check if cart is empty
+            if (cart.length === 0) {
+              setMessage("❌ Add products first");
+              setTimeout(() => setMessage(null), 2000);
+              return;
+            }
+
+            // Check if payment method is selected
+            if (!paymentMethod) {
+              setMessage("❌ Select a payment method first");
+              setTimeout(() => setMessage(null), 3000);
+              // Optionally, highlight the button
+              paymentButtonRef.current?.classList.add("ring-2", "ring-red-500");
+              setTimeout(() => paymentButtonRef.current?.classList.remove("ring-2", "ring-red-500"), 2000);
+              return;
+            }
+
+            // If cash payment, ensure cash received
+            if (paymentMethod === "Cash" && (!cashReceived || cashReceived < totalAfterDiscount)) {
+              setMessage("❌ Enter sufficient cash received");
+              setTimeout(() => setMessage(null), 3000);
+              // Highlight the Cash Received button
+              setShowCashModal(true); 
+              return;
+            }
+
+            
+            processPayment({
+              cart,
+              discount,
+              paymentMethod,
+              setCart,
+              setDiscount,
+              setDiscountValue,
+              setPaymentMethod,
+              setMessage,
+            });
+          }}
+          className="mt-auto bg-orange-500 hover:bg-yellow-600 text-white rounded-sm py-4 text-lg font-bold flex items-center justify-center"
+        >
+          <div className="text-sm mr-3">Payment</div>
+        </button>
+
         </div>
       </div>
 
