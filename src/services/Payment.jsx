@@ -7,20 +7,25 @@ export async function processPayment({ cart, discount, paymentMethod, setCart, s
   try {
     const monthKey = new Date().toISOString().slice(0, 7);
 
-    // Update stock
+    // Update stock and quantity sold
     for (const item of cart) {
       const productRef = doc(db, "products", item.id);
       const productSnap = await getDoc(productRef);
-      const currentData = productSnap.data();
+      if (!productSnap.exists()) continue;
 
-      const currentMonthlySales = currentData.monthlySales || {};
-      const currentMonthSales = currentMonthlySales[monthKey] || 0;
+      const currentData = productSnap.data();
+      const currentQty = currentData.qty || 0;
+      const currentQuantitySold = currentData.quantitySold || 0;
+
+      const newQty = Math.max(0, currentQty - item.quantity);
+      const newQuantitySold = currentQuantitySold + item.quantity;
 
       await updateDoc(productRef, {
-        qty: currentData.qty - item.quantity,
-        [`monthlySales.${monthKey}`]: currentMonthSales + item.quantity,
+        qty: newQty,
+        quantitySold: newQuantitySold,
       });
     }
+
 
     // Map items with discounted subtotal
     const saleItems = cart.map(item => {

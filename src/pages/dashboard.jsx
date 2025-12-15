@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../firebase";
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-} from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import Loading from "./functions/loading";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Archive, Box } from "lucide-react";
@@ -13,13 +8,13 @@ import { AlertTriangle, Archive, Box } from "lucide-react";
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
-  // Inventory / UI states
   const [stats, setStats] = useState({
     count: 0,
     totalQty: 0,
     lowStockCount: 0,
     deadStockCount: 0,
   });
+
   const [deadstockItems, setDeadstockItems] = useState([]);
   const [reorderItems, setReorderItems] = useState([]);
 
@@ -27,46 +22,58 @@ export default function Dashboard() {
     const fetchAll = async () => {
       try {
         const snap = await getDocs(collection(db, "products"));
-        let totalQty = 0,
-          lowStock = 0,
-          deadStock = 0;
+
+        let totalQty = 0;
+        let lowStock = 0;
+        let deadStock = 0;
 
         const deadArr = [];
         const reorderArr = [];
 
         snap.forEach((d) => {
           const data = d.data();
-          const qty = Number(data.qty || 0);
-          const threshold = Number(data.threshold || 0);
+
+          // Use exact Firestore field names
+          const qty = Number(data.qty ?? 0);
+          const threshold = Number(data.threshold ?? 0); // ML-based threshold
+          const leadTime = Number(data.leadTime ?? 0);
+          const isDead = Boolean(data.deadstock);
 
           totalQty += qty;
 
-          // LOW STOCK COUNT (< 5)
+          // Low stock items (<5)
           if (qty > 0 && qty < 5) lowStock++;
 
-          // 👍 NEW FILTER: Only include items close to threshold (qty = threshold+1 or threshold+2)
-          const isCloseToThreshold =
-            qty > threshold && qty <= threshold + 2;
+          // RESTOCK LOGIC: only if qty < ML threshold
+          if (qty < threshold) {
+            // Priority = combination of threshold and leadTime
+            // Both contribute: higher threshold and longer lead time => higher priority
+            const priorityScore = threshold * 2 + leadTime; // tweak weights if needed
 
-          if (isCloseToThreshold) {
             reorderArr.push({
               id: d.id,
               ...data,
               qty,
               threshold,
+              leadTime,
+              priorityScore,
             });
           }
 
-          // DEADSTOCK ITEMS
-          if (data.deadstock && qty > 0) {
+          // DEADSTOCK
+          if (isDead && qty > 0) {
             deadStock++;
             deadArr.push({ id: d.id, ...data, qty });
           }
         });
 
-        // Sort deadstock by highest quantity
+        // Sort deadstock by quantity DESC
         deadArr.sort((a, b) => b.qty - a.qty);
 
+        // Sort reorder items by priorityScore DESC
+        reorderArr.sort((a, b) => b.priorityScore - a.priorityScore);
+
+        // Update state
         setStats({
           count: snap.size,
           totalQty,
@@ -76,9 +83,8 @@ export default function Dashboard() {
 
         setDeadstockItems(deadArr.slice(0, 5));
         setReorderItems(reorderArr.slice(0, 5));
-
       } catch (err) {
-        console.error("Dashboard initial fetch error:", err);
+        console.error("Dashboard fetch error:", err);
       } finally {
         setLoading(false);
       }
@@ -94,21 +100,23 @@ export default function Dashboard() {
       {/* INVENTORY OVERVIEW */}
       <div className="bg-gray-50 p-6 rounded-2xl shadow-lg">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Inventory Overview</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 ">
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <OverviewCard icon={Box} label="Total Products" value={stats.count} />
           <OverviewCard icon={AlertTriangle} label="Low Stock" value={stats.lowStockCount} />
           <OverviewCard icon={Archive} label="Deadstock" value={stats.deadStockCount} />
         </div>
 
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* REORDER LIST — prioritized by threshold + leadTime */}
           {reorderItems.length > 0 && (
-            <InfoCard title={`🛒 Reorder Recommendations (${reorderItems.length})`}>
+            <InfoCard title={`🛒 Urgent Reorder (${reorderItems.length})`}>
               <ul className="divide-y divide-gray-200">
-                {reorderItems.map(item => (
+                {reorderItems.map((item) => (
                   <li key={item.id} className="flex justify-between py-2">
                     <span className="font-medium text-gray-800">{item.name}</span>
                     <span className="text-gray-600 text-sm">
-                      Qty: {item.qty} / Threshold: {item.threshold}
+                      Qty: {item.qty} | Thresh: {item.threshold} | LT: {item.leadTime}d
                     </span>
                   </li>
                 ))}
@@ -121,10 +129,11 @@ export default function Dashboard() {
             </InfoCard>
           )}
 
+          {/* DEADSTOCK */}
           {deadstockItems.length > 0 && (
             <InfoCard title={`🗄 Recently Detected Deadstock (${deadstockItems.length})`}>
               <ul className="divide-y divide-gray-200">
-                {deadstockItems.map(item => (
+                {deadstockItems.map((item) => (
                   <li key={item.id} className="flex justify-between py-2">
                     <span className="font-medium text-gray-800">{item.name}</span>
                     <span className="text-gray-600 text-sm">Qty: {item.qty}</span>
